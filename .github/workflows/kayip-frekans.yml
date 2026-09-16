@@ -71,13 +71,20 @@ jobs:
             sleep 2
           done
           ollama pull qwen2.5:7b
-      - name: Hikaye giris ses altyazi ve video uret
+      - name: Hikaye yaz ve editor kontrolunden gecir
+        timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.test != true && 120 || 15 }}
         run: |
           if [ "$SHORT_TEST" = "true" ]; then
-            python -u kayip_frekans/cloud_v3.py --smoke
+            python -u kayip_frekans/cloud_v3.py --stage story --smoke
           else
-            python -u kayip_frekans/cloud_v3.py
+            python -u kayip_frekans/cloud_v3.py --stage story
           fi
+      - name: Turkce ses ve kelime zamanli altyazi
+        timeout-minutes: 30
+        run: python -u kayip_frekans/cloud_v3.py --stage narration
+      - name: Fotograf sec ve 1080p video olustur
+        timeout-minutes: 45
+        run: python -u kayip_frekans/cloud_v3.py --stage render
       - name: Hazir videoyu indirilebilir yap
         if: always()
         uses: actions/upload-artifact@v4
@@ -102,3 +109,4 @@ jobs:
             output/visual_sources.json
             output/credits.txt
             output/plan.json
+            output/state.json

@@ -318,18 +318,32 @@ def render(title,total,segments,report):
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--smoke',action='store_true');args=parser.parse_args()
-    OUT.mkdir(exist_ok=True)
-    minutes=int(os.getenv('TARGET_MINUTES') or '30')
-    if not 5<=minutes<=35:raise ValueError('Hedef dakika 5-35 arasında olmalı.')
-    topic=(os.getenv('STORY_TOPIC') or 'Köy evinin kapısından ölmüş kardeşimin sesini duydum')[:1200]
-    title,parts,report=create_story(topic,minutes,args.smoke)
-    save('story.txt','\n\n'.join(parts))
-    total,segments,cues=narrate(parts)
-    report['measured_narration_seconds']=total;save('quality_report.json',report)
-    duration_gate(total,minutes,args.smoke)
-    if any(b<a or b>total+.5 for a,b,t in cues):raise ValueError('Altyazı zamanı ses aralığı dışında.')
-    render(title,total,segments,report)
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--smoke',action='store_true')
+    parser.add_argument('--stage',choices=['all','story','narration','render'],default='all')
+    args=parser.parse_args();OUT.mkdir(exist_ok=True)
+    if args.stage in ('all','story'):
+        minutes=int(os.getenv('TARGET_MINUTES') or '30')
+        if not 5<=minutes<=35:raise ValueError('Hedef dakika 5-35 arasında olmalı.')
+        topic=(os.getenv('STORY_TOPIC') or 'Köy evinin kapısından ölmüş kardeşimin sesini duydum')[:1200]
+        print('Hikâye yazımı ve editör incelemesi başladı.',flush=True)
+        title,parts,report=create_story(topic,minutes,args.smoke)
+        save('story.txt','\n\n'.join(parts))
+        state={'title':title,'parts':parts,'report':report,'minutes':minutes}
+        save('state.json',state)
+        if args.stage=='story':return
+    else:state=json.loads((OUT/'state.json').read_text(encoding='utf-8'))
+    title,parts,report,minutes=(state[k] for k in ['title','parts','report','minutes'])
+    if args.stage in ('all','narration'):
+        print('Paragraf seslendirmesi ve kelime zamanlama başladı.',flush=True)
+        total,segments,cues=narrate(parts)
+        report['measured_narration_seconds']=total;save('quality_report.json',report)
+        duration_gate(total,minutes,report['preview'])
+        if any(b<a or b>total+.5 for a,b,t in cues):raise ValueError('Altyazı zamanı ses aralığı dışında.')
+        state.update({'total':total,'segments':segments,'report':report});save('state.json',state)
+        if args.stage=='narration':return
+    print('Fotoğraf seçimi ve 1080p montaj başladı.',flush=True)
+    render(title,state['total'],state['segments'],report)
     print('V3 üretimi ve teknik kalite kapıları tamamlandı.',flush=True)
 
 
