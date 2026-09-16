@@ -41,7 +41,7 @@ jobs:
       - name: Turkce giris ve kalite testleri
         run: python -m unittest discover -s kayip_frekans -p 'test_*.py' -v
       - name: Python sozdizimi
-        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/cloud_v4.py kayip_frekans/cloud_v5.py kayip_frekans/quality.py
+        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/cloud_v4.py kayip_frekans/cloud_v5.py kayip_frekans/cloud_v6.py kayip_frekans/quality.py
   video:
     if: github.event.repository.private == false && github.event_name != 'pull_request'
     needs: quality
@@ -80,16 +80,16 @@ jobs:
         timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.test != true && 120 || 15 }}
         run: |
           if [ "$SHORT_TEST" = "true" ]; then
-            python -u kayip_frekans/cloud_v5.py --stage story --smoke
+            python -u kayip_frekans/cloud_v6.py --stage story --smoke
           else
-            python -u kayip_frekans/cloud_v5.py --stage story
+            python -u kayip_frekans/cloud_v6.py --stage story
           fi
       - name: Turkce ses ve kelime zamanli altyazi
         timeout-minutes: 30
-        run: python -u kayip_frekans/cloud_v5.py --stage narration
-      - name: Fotograf sec ve 1080p video olustur
+        run: python -u kayip_frekans/cloud_v6.py --stage narration
+      - name: Sahne sec ve 1080p sinematik video olustur
         timeout-minutes: 45
-        run: python -u kayip_frekans/cloud_v5.py --stage render
+        run: python -u kayip_frekans/cloud_v6.py --stage render
       - name: Hazir videoyu indirilebilir yap
         if: always()
         uses: actions/upload-artifact@v4
