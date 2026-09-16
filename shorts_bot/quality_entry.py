@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 
 import upgrade
 import visual_guard
@@ -12,12 +13,55 @@ _original_run = upgrade.bot.run
 _original_build = upgrade.aligned_build_video
 _original_choose_topic = upgrade.choose_topic
 _original_generate_plan = upgrade.generate_plan
+_original_validate_plan = upgrade.validate_plan
 _original_model_json = upgrade.model_json
 _original_die = upgrade.bot.die
 
 
 class DraftRejected(Exception):
     """Rejected factual or malformed draft, preserving actionable feedback."""
+
+
+# Distinctive concrete subjects from other formats/topics. A video about soap
+# bubbles must not silently switch to popcorn just because both things pop.
+# Keep this guard deliberately conservative: reject clear subject words only;
+# the independent editorial review handles more subtle narrative drift.
+SUBJECT_FAMILIES = {
+    "popcorn": {"popcorn", "kernel", "kernels"},
+    "bread": {"bread", "dough", "yeast"},
+    "soap": {"soap", "soapy", "suds", "bubble", "bubbles"},
+    "banana": {"banana", "bananas"},
+    "onion": {"onion", "onions"},
+    "zipper": {"zipper", "zippers"},
+    "penguin": {"penguin", "penguins"},
+    "octopus": {"octopus", "octopuses", "octopi"},
+    "bat": {"bat", "bats", "echolocation"},
+    "spider": {"spider", "spiders", "webs"},
+    "compass": {"compass", "compasses", "lodestone"},
+}
+
+
+def checked_validate_plan(plan, theme):
+    checked = _original_validate_plan(plan, theme)
+    topic = str(checked.get("topic") or "").lower()
+    topic_words = set(re.findall(r"[a-z]+", topic))
+    relevant_families = {
+        name for name, terms in SUBJECT_FAMILIES.items()
+        if name in topic_words or terms.intersection(topic_words)
+    }
+    # The generated plan has one exact topic, not a collection of unrelated
+    # examples. Catch alien named subjects even when the other queries look apt.
+    for index, scene in enumerate(checked["scenes"], 1):
+        content = " ".join(str(scene.get(key, "")) for key in ("voiceover", "query", "caption"))
+        content += " " + " ".join(str(q) for q in scene.get("backup_queries", []))
+        words = set(re.findall(r"[a-z]+", content.lower()))
+        for name, terms in SUBJECT_FAMILIES.items():
+            if name not in relevant_families and terms.intersection(words):
+                raise ValueError(
+                    f"Scene {index} switched away from topic {topic!r} to unrelated "
+                    f"subject {name!r}; regenerate the entire plan and its footage queries"
+                )
+    return checked
 
 
 def safe_render(command: list[str]) -> None:
@@ -56,6 +100,10 @@ def trend_plan():
                     "per scene. The first sentence MUST end with a period, question "
                     "mark or exclamation point after 7-10 words. "
                     "Use two specific 2-5-word backup stock queries per scene. "
+                    "MANDATORY TOPIC ISOLATION: All voiceovers, captions and visual "
+                    "queries must describe ONLY the assigned topic. Never introduce "
+                    "other objects or subjects from previous drafts, examples or "
+                    "unrelated ideas. No popcorn or kernels in soap-bubble stories. "
                     "MANDATORY VISUAL FEASIBILITY: each stock video can visibly "
                     "show the narrated subject. Avoid internal anatomy, microscopic "
                     "processes and unfilmable historical recreations. Explain unseen "
@@ -111,6 +159,7 @@ def checked_build(plan, audio_path):
 
 upgrade.bot.run = safe_render
 upgrade.choose_topic = trend_topic
+upgrade.validate_plan = checked_validate_plan
 upgrade.generate_plan = trend_plan
 upgrade.matched_pexels_video = selection_guard.choose
 upgrade.aligned_build_video = checked_build
