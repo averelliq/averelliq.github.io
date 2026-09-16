@@ -18,20 +18,37 @@ on:
     paths:
       - kayip_frekans/**
       - .github/workflows/kayip-frekans.yml
+  pull_request:
+    paths:
+      - kayip_frekans/**
+      - .github/workflows/kayip-frekans.yml
 permissions:
   contents: read
 concurrency:
-  group: kayip-frekans
+  group: kayip-frekans-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Turkce giris ve kalite testleri
+        run: python -m unittest discover -s kayip_frekans -p 'test_*.py' -v
+      - name: Python sozdizimi
+        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/quality.py
   video:
     if: github.event.repository.private == false
+    needs: quality
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
       STORY_TOPIC: ${{ inputs.topic }}
       TARGET_MINUTES: ${{ inputs.minutes || '30' }}
-      SHORT_TEST: ${{ github.event_name == 'push' || inputs.test }}
+      SHORT_TEST: ${{ github.event_name != 'workflow_dispatch' || inputs.test }}
       OLLAMA_HOST: 127.0.0.1:11434
     steps:
       - uses: actions/checkout@v4
@@ -51,12 +68,12 @@ jobs:
             sleep 2
           done
           ollama pull qwen2.5:7b
-      - name: Hikaye ses altyazi ve video uret
+      - name: Hikaye giris ses altyazi ve video uret
         run: |
           if [ "$SHORT_TEST" = "true" ]; then
-            python -u kayip_frekans/bot.py --smoke
+            python -u kayip_frekans/cloud_v2.py --smoke
           else
-            python -u kayip_frekans/bot.py
+            python -u kayip_frekans/cloud_v2.py
           fi
       - name: Hazir videoyu indirilebilir yap
         uses: actions/upload-artifact@v4
@@ -69,6 +86,9 @@ jobs:
             output/final.mp4
             output/thumbnail.jpg
             output/story.txt
+            output/story_only.txt
+            output/intro.txt
             output/captions.srt
             output/metadata.json
             output/validation.json
+            output/quality_report.json
