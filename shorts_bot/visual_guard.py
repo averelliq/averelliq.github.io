@@ -1,7 +1,6 @@
-"""Fail-closed, scene-by-scene stock-footage relevance check before YouTube upload.
+"""Fail-closed actual-video review: verify three moments of EVERY selected clip.
 
-The plan's textual AI review cannot know what a stock search actually returned.
-Inspect an extracted frame from every downloaded clip with a vision-capable model.
+An AI vision decision is an imperfect relevance check, not a guarantee of accuracy.
 """
 from __future__ import annotations
 
@@ -14,90 +13,133 @@ from typing import Any
 
 import requests
 
+FRAME_FRACTIONS = (0.18, 0.50, 0.82)
 
-def _frame(source: Path, destination: Path) -> bytes:
-    duration = subprocess.run(
+
+def _duration(path: Path) -> float:
+    result = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", str(source)],
-        capture_output=True, text=True, check=True,
+         "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+        check=True, text=True, capture_output=True,
     )
-    midpoint = max(0.05, min(float(duration.stdout.strip()) / 2, 3.0))
-    subprocess.run(
-        ["ffmpeg", "-y", "-v", "error", "-ss", f"{midpoint:.3f}", "-i", str(source),
-         "-frames:v", "1", "-vf", "scale=270:-2", "-q:v", "5", str(destination)],
-        check=True,
-    )
-    image = destination.read_bytes()
-    if len(image) < 1_000 or len(image) > 2_000_000:
-        raise ValueError("Stock preview image is missing or unexpectedly large")
-    return image
+    duration = float(result.stdout.strip())
+    if not 2.0 <= duration <= 600:
+        raise ValueError(f"Stock clip has invalid/short duration: {duration}")
+    return duration
 
 
-def _model_review(plan: dict[str, Any], previews: list[bytes]) -> list[dict[str, Any]]:
+def sample_frames(source: Path, work: Path, prefix: str) -> list[bytes]:
+    """Use early/mid/late actual footage, not search thumbnail or one lucky frame."""
+    duration = _duration(source)
+    images: list[bytes] = []
+    for number, fraction in enumerate(FRAME_FRACTIONS):
+        dest = work / f"{prefix}_{number}.jpg"
+        timestamp = min(duration - 0.15, max(0.08, duration * fraction))
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-ss", f"{timestamp:.3f}",
+             "-i", str(source), "-frames:v", "1", "-vf", "scale=320:-2",
+             "-q:v", "5", str(dest)],
+            check=True, capture_output=True,
+        )
+        image = dest.read_bytes()
+        if not 1_000 <= len(image) <= 2_000_000:
+            raise ValueError("A clip's preview frame is missing/invalid")
+        images.append(image)
+    return images
+
+
+def _model_review(plan: dict[str, Any], previews: list[list[bytes]]) -> list[dict[str, Any]]:
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
-        raise ValueError("Visual review requires GEMINI_API_KEY; publishing is blocked")
+        raise ValueError("No Gemini key for visual review; publishing blocked")
+    if len(plan.get("scenes", [])) != len(previews) or any(len(p) != 3 for p in previews):
+        raise ValueError("Every scene needs exactly three actual-frame previews")
     model = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash").strip()
     parts: list[dict[str, Any]] = [{"text": (
-        "You are a strict video quality reviewer. The following images are actual frames of "
-        "the stock clips selected for a YouTube educational Short, one image per numbered scene. "
-        "Compare the visible imagery with EACH scene's narration, not the clip's search query. "
-        "Approve a scene only if the image depicts the narrated subject or an unmistakably "
-        "relevant explanatory visual. REJECT mismatched historical civilizations or eras, "
-        "unrelated people, unrelated animals, unrelated household objects, a generic DJ "
-        "instead of animal echolocation, irrelevant green screens, unrelated abstract footage, "
-        "food already cooked when an unpopped kernel is required, and generic scenery with "
-        "no narrated subject. An image of a related category is not enough if the specific "
-        "visual meaning is wrong. If uncertain, reject and state why. "
-        "Do not try to verify outside facts. Return ONLY JSON with shape "
-        '{"scenes":[{"number":1,"approved":false,"reason":"specific visual mismatch"}]}. '
-        "Include exactly one decision for each supplied scene."
+        "You are a strict visual continuity checker, not a fact-checker. These are actual "
+        "EARLY, MIDDLE and LATE frames from a REAL stock clip for each scene. "
+        "Compare all three frames to that scene's SPOKEN narration (not its search terms). "
+        "Approve only if the exact depicted subject or a DIRECT, unmistakable explanatory "
+        "visual is relevant throughout the clip. Reject generic category matches, abstract "
+        "screens, green-screen templates, DJs or audio mixers for bat echolocation, people "
+        "wearing animal costumes instead of actual animals, Egyptian hieroglyphs or Buddhist "
+        "figures for ancient Chinese compass history, flowers for water inside popcorn, "
+        "already popped corn for unpopped kernels, and other wrong object/era/country. "
+        "If the exact object/era is not visible or uncertain, REJECT. Do not infer invisible "
+        "objects from narration. Each individual frame must match. Report specific visible "
+        "evidence and why it supports the narration; no vague 'relevant footage' answers. "
+        "Return ONLY JSON: {\"scenes\":[{\"number\":1,\"approved\":false,"
+        "\"frames\":[false,false,false],\"evidence\":\"visible subject or mismatch\","
+        "\"reason\":\"specific explanation\"}]}. Exactly one result per scene, "
+        "frames must contain EXACTLY three booleans; approved=true only if ALL three true."
     )}]
-    for i, (scene, image) in enumerate(zip(plan["scenes"], previews), 1):
-        parts.append({"text": f"Scene {i}; spoken narration: {scene['voiceover']}"})
-        parts.append({"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(image).decode("ascii")}})
+    for number, (scene, images) in enumerate(zip(plan["scenes"], previews), 1):
+        parts.append({"text": f"Scene {number} NARRATION: {scene['voiceover']}"})
+        for label, image in zip(("EARLY", "MIDDLE", "LATE"), images):
+            parts.append({"text": f"Scene {number} {label} frame:"})
+            parts.append({"inline_data": {"mime_type": "image/jpeg",
+                                           "data": base64.b64encode(image).decode("ascii")}})
     response = requests.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
         json={"contents": [{"parts": parts}], "generationConfig": {
-            "responseMimeType": "application/json", "maxOutputTokens": 2048}},
-        timeout=120,
+            "responseMimeType": "application/json", "maxOutputTokens": 4096}},
+        timeout=150,
     )
     response.raise_for_status()
     data = response.json()
     text = "".join(p.get("text", "") for p in data["candidates"][0]["content"]["parts"])
-    result = json.loads(text)
-    decisions = result.get("scenes")
+    decisions = json.loads(text).get("scenes")
     if not isinstance(decisions, list) or len(decisions) != len(previews):
-        raise ValueError("Visual review returned an incomplete scene count")
+        raise ValueError("Vision review returned incomplete decisions")
     return decisions
 
 
+def verdict(decision: Any, scene_number: int) -> tuple[bool, str]:
+    """Malformed, partial and ambiguous AI decisions always mean no approval."""
+    if not isinstance(decision, dict) or decision.get("number") != scene_number:
+        return False, "missing/misnumbered decision"
+    frame_checks = decision.get("frames")
+    evidence = decision.get("evidence", "")
+    reason = decision.get("reason", "")
+    approved = (decision.get("approved") is True and isinstance(frame_checks, list)
+                and len(frame_checks) == 3 and all(x is True for x in frame_checks)
+                and isinstance(evidence, str) and len(evidence.strip()) >= 12)
+    return approved, str(reason if not approved else evidence)[:200]
+
+
+def review_candidate(scene: dict[str, Any], source: Path, work: Path, index: int) -> tuple[bool, str]:
+    """Reject a candidate BEFORE rendering; caller tries the next Pexels clip."""
+    frames = sample_frames(source, work, f"candidate_{index:02d}")
+    decisions = _model_review({"scenes": [scene]}, [frames])
+    return verdict(decisions[0], 1)
+
+
 def check(plan: dict[str, Any], work: Path, video: Path) -> None:
-    """Raise on any uncertainty; the caller must NEVER upload after failure."""
+    """Independent final check. Exception MUST prevent any YouTube upload."""
     if not video.is_file() or not plan.get("scenes"):
-        raise ValueError("Missing video or approved scene plan")
+        raise ValueError("Missing final video or scene plan")
     scenes = plan["scenes"]
     ids = [s.get("pexels_video_id") for s in scenes]
-    if any(not isinstance(video_id, int) or video_id <= 0 for video_id in ids):
-        raise ValueError("Stock footage provenance missing; upload cancelled")
+    if any(type(video_id) is not int or video_id <= 0 for video_id in ids):
+        raise ValueError("Missing stock-video provenance; upload cancelled")
     if len(set(ids)) != len(ids):
-        raise ValueError("The same stock video was used in multiple scenes; upload cancelled")
-    previews = []
+        raise ValueError("A stock video is repeated between scenes; upload cancelled")
+    previews: list[list[bytes]] = []
     for index in range(len(scenes)):
         source = work / f"source_{index:02d}.mp4"
         if not source.is_file():
-            raise ValueError(f"Scene {index + 1} has no downloaded stock footage")
-        previews.append(_frame(source, work / f"review_{index:02d}.jpg"))
+            raise ValueError(f"Stock clip for scene {index + 1} missing")
+        previews.append(sample_frames(source, work, f"final_review_{index:02d}"))
     decisions = _model_review(plan, previews)
     failures = []
     for number, decision in enumerate(decisions, 1):
-        if (not isinstance(decision, dict) or decision.get("number") != number
-                or decision.get("approved") is not True):
-            reason = decision.get("reason", "missing approval") if isinstance(decision, dict) else "invalid response"
-            failures.append(f"scene {number}: {str(reason)[:140]}")
-    plan["visual_review"] = {"approved": not failures, "scene_decisions": decisions}
+        approved, explanation = verdict(decision, number)
+        if not approved:
+            failures.append(f"scene {number}: {explanation}")
+    plan["visual_review"] = {"approved": not failures, "scene_decisions": decisions,
+                             "frames_checked_per_scene": 3}
     (video.parent / "plan.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
     if failures:
-        raise ValueError("Visual footage mismatch; upload cancelled: " + "; ".join(failures))
-    print(f"Visual review approved all {len(scenes)} actual stock-footage scenes.", flush=True)
+        raise ValueError("Final visual mismatch; upload cancelled: " + "; ".join(failures))
+    print(f"Final visual review approved {len(scenes)} scenes x 3 frames.", flush=True)
