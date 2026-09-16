@@ -37,7 +37,7 @@ jobs:
       YOUTUBE_PRIVACY: public
       GEMINI_MODEL: gemini-3.6-flash
       TTS_VOICE: am_michael
-      SHORTS_SKIP_UPLOAD: ${{ github.event_name == 'push' || inputs.smoke_test == true && '1' || '0' }}
+      SHORTS_SKIP_UPLOAD: ${{ (github.event_name == 'push' || inputs.smoke_test == true) && '1' || '0' }}
 
     steps:
       - name: Checkout
