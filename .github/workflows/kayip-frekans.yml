@@ -51,7 +51,6 @@ jobs:
             sleep 2
           done
           ollama pull qwen2.5:7b
-          python -m piper.download_voices tr_TR-fettah-medium
       - name: Hikaye ses altyazi ve video uret
         run: |
           if [ "$SHORT_TEST" = "true" ]; then

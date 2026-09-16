@@ -1,5 +1,7 @@
 """KAYIP FREKANS_: cloud CPU story, Turkish speech and atmospheric video."""
 import argparse
+import asyncio
+import time
 import hashlib
 import json
 import math
@@ -136,9 +138,7 @@ def stamp(t):
 
 
 def produce(title, parts, smoke):
-    from piper import PiperVoice, SynthesisConfig
-    voice=PiperVoice.load('tr_TR-fettah-medium.onnx')
-    config=SynthesisConfig(length_scale=1.08)
+    import edge_tts
     clips=[]; cues=[]; total=0; segment=[]; count=0
     for part in parts:
         for sentence in sentences(part):
@@ -151,8 +151,14 @@ def produce(title, parts, smoke):
         texts=[]; frames=[]; sample_rate=None
         for sentence in group:
             path=OUT/'sentence.wav'
-            with wave.open(str(path),'wb') as w:
-                voice.synthesize_wav(sentence,w,syn_config=config)
+            for attempt in range(3):
+                try:
+                    asyncio.run(edge_tts.Communicate(sentence, 'tr-TR-AhmetNeural', rate='-8%').save(str(OUT/'sentence.mp3')))
+                    break
+                except Exception:
+                    if attempt == 2: raise
+                    time.sleep(2 ** attempt)
+            run('ffmpeg','-hide_banner','-loglevel','error','-y','-i',OUT/'sentence.mp3','-ar','24000','-ac','1',path)
             with wave.open(str(path),'rb') as w:
                 rate=w.getframerate(); audio=w.readframes(w.getnframes()); duration=w.getnframes()/rate
                 if sample_rate is not None and sample_rate!=rate: raise ValueError('Ses frekansı değişti')
