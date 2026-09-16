@@ -21,7 +21,7 @@ jobs:
       SHORTS_THEME: everyday
       SHORTS_AI_REVIEW: '1'
       SHORTS_TREND_MODE: auto
-      SHORTS_TEST_TOPIC_OVERRIDE: 'why ice floats in water'
+      SHORTS_TEST_TOPIC_OVERRIDE: 'how a zipper works'
       SHORTS_MAX_VISUAL_CANDIDATES: '9'
       SHORTS_SKIP_UPLOAD: '1'
       YOUTUBE_PRIVACY: private
@@ -45,7 +45,7 @@ jobs:
           pip install -r shorts_bot/requirements.txt
           pip check
           python -m py_compile shorts_bot/*.py
-      - name: Generate complete MP4 for ice-flotation topic; DO NOT UPLOAD
+      - name: Generate complete MP4 for zipper topic; DO NOT UPLOAD
         run: python shorts_bot/quality_entry.py
       - name: Inspect MP4 container and speech level after a successful run
         if: success()
