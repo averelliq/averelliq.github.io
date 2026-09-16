@@ -52,7 +52,21 @@ jobs:
           sudo apt-get install -y ffmpeg espeak-ng libsndfile1
 
       - name: Install Python packages
-        run: pip install -r shorts_bot/requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r shorts_bot/requirements.txt
+          pip check
+
+      - name: Preflight checks
+        run: |
+          python -m py_compile shorts_bot/main.py
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+          python - <<'PY'
+          import requests, soundfile
+          from kokoro import KPipeline
+          print('Python imports OK')
+          PY
 
       - name: Generate and upload Short
         run: python shorts_bot/main.py
