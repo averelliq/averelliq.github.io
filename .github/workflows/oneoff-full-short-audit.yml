@@ -1,0 +1,60 @@
+name: One-Off Full Shorts MP4 Audit
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/oneoff-full-short-audit.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  produce-without-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      YT_DATA_API_KEY: ${{ secrets.YT_DATA_API_KEY }}
+      GEMINI_MODEL: gemini-3.6-flash
+      TTS_VOICE: am_michael
+      SHORTS_THEME: science
+      SHORTS_AI_REVIEW: '1'
+      SHORTS_TREND_MODE: auto
+      SHORTS_SKIP_UPLOAD: '1'
+      YOUTUBE_PRIVACY: private
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: shorts_bot/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: kokoro-${{ runner.os }}-v1
+      - name: Install ffmpeg and speech dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg espeak-ng libsndfile1
+      - name: Install Python dependencies and validate source
+        run: |
+          pip install -r shorts_bot/requirements.txt
+          pip check
+          python -m py_compile shorts_bot/*.py
+      - name: Generate complete MP4 with trend discovery, narration, footage, captions, vision reviews; DO NOT UPLOAD
+        run: python shorts_bot/quality_entry.py
+      - name: Preserve actual output, plan and footage provenance even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audited-short-${{ github.run_id }}
+          path: |
+            shorts_bot/output/short.mp4
+            shorts_bot/output/plan.json
+            shorts_bot/output/visual_sources.json
+            shorts_bot/work/captions.srt
+            shorts_bot/work/voice.wav
+          if-no-files-found: ignore
+          retention-days: 3
