@@ -1,0 +1,87 @@
+name: Visual QA live regression (no upload)
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/visual-live-regression.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-bad-stock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      GEMINI_MODEL: gemini-3.5-flash-lite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install minimum preview tools
+        run: |
+          pip install requests
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+      - name: Check two previously misselected Pexels clips; NEVER upload
+        run: |
+          python - <<'PY'
+          import os, sys, tempfile, types
+          from pathlib import Path
+          import requests
+          sys.path.insert(0, 'shorts_bot')
+          import visual_guard
+          key = os.environ['PEXELS_API_KEY']
+          session = requests.Session()
+          with tempfile.TemporaryDirectory() as folder:
+              work = Path(folder)
+              cases = [
+                  (36637000, 'ice cube', 'Drop an ice cube into your drink, and something deeply weird happens.',
+                   'It floats right at the top instead of sinking to the bottom.', 4.25),
+                  (7127974, 'hydrogen bonds', 'Water does the exact opposite because of its unique chemical architecture.',
+                   'As liquid water cools down, hydrogen bonds lock into a rigid crystal framework.', 6.4),
+              ]
+              errors = []
+              for stock_id, label, previous, narration, length in cases:
+                  response = session.get(f'https://api.pexels.com/videos/videos/{stock_id}', headers={'Authorization': key}, timeout=45)
+                  response.raise_for_status()
+                  videos = response.json().get('video_files', [])
+                  matches = [f for f in videos if f.get('link', '').startswith('https://') and
+                             int(f.get('height') or 0) > int(f.get('width') or 0) and
+                             int(f.get('height') or 0) >= 720 and int(f.get('width') or 0) >= 360]
+                  if not matches:
+                      raise RuntimeError(f'Pexels asset {stock_id}: no portrait file')
+                  matches.sort(key=lambda f: abs(int(f['width'])-1080)+abs(int(f['height'])-1920))
+                  source = work / f'{stock_id}.mp4'
+                  for item in matches[:2]:
+                      source.unlink(missing_ok=True)
+                      try:
+                          total = 0
+                          with session.get(item['link'], stream=True, timeout=90) as download:
+                              download.raise_for_status()
+                              with source.open('wb') as output:
+                                  for chunk in download.iter_content(1048576):
+                                      total += len(chunk)
+                                      if total > 35 * 1048576:
+                                          raise ValueError('asset over 35MB')
+                                      output.write(chunk)
+                          break
+                      except (requests.RequestException, ValueError):
+                          source.unlink(missing_ok=True)
+                  if not source.exists():
+                      raise RuntimeError(f'Pexels asset {stock_id}: cannot download a suitable file')
+                  scene = {'voiceover': narration}
+                  plan = {'topic': 'why ice floats in water', 'previous_narration': previous,
+                          'scenes': [scene], 'scene_durations': [length]}
+                  sys.modules['upgrade'] = types.SimpleNamespace(CURRENT_PLAN=plan)
+                  approved, reason = visual_guard.review_candidate(scene, source, work, 0)
+                  print(f'{label}: approved={approved}; explanation={reason[:200]}')
+                  if approved:
+                      errors.append(label)
+              if errors:
+                  raise AssertionError('Previously mismatched stock still passes: '+', '.join(errors))
+              print('PASS: both previously mismatched videos rejected BEFORE rendering. No uploads.')
+          PY
