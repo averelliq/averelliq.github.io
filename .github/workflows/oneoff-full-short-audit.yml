@@ -18,7 +18,7 @@ jobs:
       YT_DATA_API_KEY: ${{ secrets.YT_DATA_API_KEY }}
       GEMINI_MODEL: gemini-3.5-flash-lite
       TTS_VOICE: am_michael
-      SHORTS_THEME: science
+      SHORTS_THEME: everyday
       SHORTS_AI_REVIEW: '1'
       SHORTS_TREND_MODE: auto
       SHORTS_SKIP_UPLOAD: '1'
