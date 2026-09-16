@@ -16,8 +16,8 @@ _original_model_json = upgrade.model_json
 _original_die = upgrade.bot.die
 
 
-class EditorialRejected(Exception):
-    """An editor's rejection with its original actionable factual feedback."""
+class DraftRejected(Exception):
+    """Rejected factual or malformed draft, preserving actionable feedback."""
 
 
 def safe_render(command: list[str]) -> None:
@@ -47,27 +47,35 @@ def trend_topic(theme: str) -> str:
 
 def trend_plan():
     feedback = ""
-    for attempt in range(3):
+    for attempt in range(5):
         def reviewed_model_json(prompt: str):
             if prompt.startswith("You are an English-language, original educational Shorts scriptwriter."):
                 prompt += (
-                    "\nMANDATORY VISUAL FEASIBILITY: Narrate only things that can clearly be "
-                    "shown in real portrait stock footage. Do not require internal anatomy, "
-                    "microscopic processes, inaccessible historical reconstructions, or "
-                    "invisible changes to be seen; explain mechanisms without pretending "
-                    "footage depicts them. Each scene needs three independently matching "
-                    "visible moments. Keep every claim scientifically accurate."
+                    "\nMANDATORY STRUCTURE: 7-9 scenes, exactly 75-90 narration words total, "
+                    "7-10 words in the first sentence of scene one, 8-15 spoken words "
+                    "per scene. The first sentence MUST end with a period, question "
+                    "mark or exclamation point after 7-10 words. "
+                    "Use two specific 2-5-word backup stock queries per scene. "
+                    "MANDATORY VISUAL FEASIBILITY: each stock video can visibly "
+                    "show the narrated subject. Avoid internal anatomy, microscopic "
+                    "processes and unfilmable historical recreations. Explain unseen "
+                    "mechanisms without claiming footage depicts them. "
+                    "Keep every factual claim accurate."
                 )
                 if feedback:
-                    prompt += ("\nPREVIOUS DRAFT WAS REJECTED FOR THIS SPECIFIC ERROR: "
-                               + feedback + "\nCorrect the factual error and revise the "
-                               "surrounding scenes; do not repeat the rejected claim.")
+                    prompt += ("\nPREVIOUS DRAFT WAS REJECTED FOR THIS SPECIFIC ISSUE: "
+                               + feedback + "\nGenerate a corrected NEW full JSON plan, "
+                               "especially fixing the exact rejected constraint. "
+                               "Do not repeat the rejected claim or malformed structure.")
             return _original_model_json(prompt)
 
         def review_aware_die(message: str, code: int = 1):
-            marker = "AI editorial check rejected this Short: "
-            if isinstance(message, str) and message.startswith(marker):
-                raise EditorialRejected(message[len(marker):][:600])
+            editorial = "AI editorial check rejected this Short: "
+            structural = "Two generated plans failed structural quality checks: "
+            if isinstance(message, str) and message.startswith(editorial):
+                raise DraftRejected(message[len(editorial):][:600])
+            if isinstance(message, str) and message.startswith(structural):
+                raise DraftRejected(message[len(structural):][:600])
             return _original_die(message, code)
 
         upgrade.model_json = reviewed_model_json
@@ -75,12 +83,11 @@ def trend_plan():
         try:
             plan = _original_generate_plan()
             break
-        except EditorialRejected as exc:
-            if attempt == 2:
-                _original_die("Three editor-rejected drafts; upload cancelled. Last issues: " + str(exc))
+        except DraftRejected as exc:
+            if attempt == 4:
+                _original_die("Five rejected drafts; upload cancelled. Last issues: " + str(exc))
             feedback = str(exc)
-            print(f"Editorial review rejected draft {attempt + 1}/3; rewriting with factual feedback: {feedback}",
-                  flush=True)
+            print(f"Draft rejected {attempt + 1}/5; regenerating with targeted feedback: {feedback}", flush=True)
         finally:
             upgrade.model_json = _original_model_json
             upgrade.bot.die = _original_die
