@@ -22,6 +22,7 @@ jobs:
       SHORTS_AI_REVIEW: '1'
       SHORTS_TREND_MODE: auto
       SHORTS_TEST_TOPIC_OVERRIDE: 'why soap bubbles form and burst'
+      SHORTS_MAX_VISUAL_CANDIDATES: '9'
       SHORTS_SKIP_UPLOAD: '1'
       YOUTUBE_PRIVACY: private
     steps:
@@ -44,7 +45,7 @@ jobs:
           pip install -r shorts_bot/requirements.txt
           pip check
           python -m py_compile shorts_bot/*.py
-      - name: Generate complete MP4 after structural draft repair; DO NOT UPLOAD
+      - name: Generate complete MP4 after scene-topic isolation; DO NOT UPLOAD
         run: python shorts_bot/quality_entry.py
       - name: Inspect MP4 container and speech level after a successful run
         if: success()
