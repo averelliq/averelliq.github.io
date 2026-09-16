@@ -1,0 +1,51 @@
+name: Three Factual Shorts Preview 2026-09-16
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/three-factual-shorts-preview-20260916.yml]
+permissions:
+  contents: read
+jobs:
+  previews:
+    name: Preview ${{ matrix.slug }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        slug: [water, cats, candle]
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      TTS_VOICE: am_michael
+      SHORTS_SKIP_UPLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: shorts_bot/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: kokoro-${{ runner.os }}-v1
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg espeak-ng libsndfile1
+          pip install -r shorts_bot/requirements.txt
+          python -m py_compile shorts_bot/three_reviewed_shorts_20260916.py
+      - name: Produce one complete MP4 without YouTube upload
+        run: python shorts_bot/three_reviewed_shorts_20260916.py '${{ matrix.slug }}'
+      - name: Save MP4 and audit plan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: factual-preview-${{ matrix.slug }}-${{ github.run_id }}
+          path: |
+            shorts_bot/reviewed/${{ matrix.slug }}/short.mp4
+            shorts_bot/reviewed/${{ matrix.slug }}/plan.json
+            shorts_bot/reviewed/${{ matrix.slug }}/captions.srt
+          retention-days: 3
+          if-no-files-found: ignore
