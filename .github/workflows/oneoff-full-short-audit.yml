@@ -21,6 +21,7 @@ jobs:
       SHORTS_THEME: everyday
       SHORTS_AI_REVIEW: '1'
       SHORTS_TREND_MODE: auto
+      SHORTS_TEST_TOPIC_OVERRIDE: 'why soap bubbles form and burst'
       SHORTS_SKIP_UPLOAD: '1'
       YOUTUBE_PRIVACY: private
     steps:
@@ -43,7 +44,7 @@ jobs:
           pip install -r shorts_bot/requirements.txt
           pip check
           python -m py_compile shorts_bot/*.py
-      - name: Generate complete MP4 with trend discovery, narration, footage, captions, vision reviews; DO NOT UPLOAD
+      - name: Generate complete MP4 with narration, licensed footage, captions, vision reviews; DO NOT UPLOAD
         run: python shorts_bot/quality_entry.py
       - name: Preserve actual output, plan and footage provenance even on failure
         if: always()
