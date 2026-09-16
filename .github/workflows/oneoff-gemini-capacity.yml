@@ -1,0 +1,43 @@
+name: One-Off Gemini Text Capacity Probe
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/oneoff-gemini-capacity.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test low-cost alternatives and report sanitized HTTP status only
+        shell: bash
+        run: |
+          pip install --quiet requests==2.34.2
+          python - <<'PY'
+          import os, requests
+          k=os.environ.get('GEMINI_API_KEY','')
+          if not k:
+              raise SystemExit('Gemini key missing')
+          models=('gemini-3.5-flash-lite','gemini-3.1-flash-lite','gemini-2.5-flash-lite')
+          for model in models:
+              try:
+                  r=requests.post('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',headers={'x-goog-api-key':k,'Content-Type':'application/json'},json={'contents':[{'parts':[{'text':'Reply with just OK.'}]}],'generationConfig':{'maxOutputTokens':16}},timeout=18)
+                  reason=''
+                  if not r.ok:
+                      error=r.json().get('error',{})
+                      reason=str(error.get('status',''))[:40]
+                  print('MODEL',model,'HTTP',r.status_code,'REASON',reason,flush=True)
+                  if r.ok:
+                      print('USABLE MODEL:',model,flush=True)
+                      break
+              except Exception as exc:
+                  print('MODEL',model,'ERROR',type(exc).__name__,flush=True)
+          print('No video produced/uploaded; no secrets printed.',flush=True)
+          PY
