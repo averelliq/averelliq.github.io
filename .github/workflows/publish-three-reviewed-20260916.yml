@@ -1,0 +1,100 @@
+name: Publish Three Reviewed Factual Shorts
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-three-reviewed-20260916.yml]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: reviewed-shorts-upload-20260916
+  cancel-in-progress: false
+jobs:
+  publish-three:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+      YOUTUBE_PRIVACY: public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download previously reviewed cat video
+        uses: actions/download-artifact@v4
+        with:
+          name: factual-preview-cats-35129920733
+          path: reviewed/cats
+          run-id: 35129920733
+          github-token: ${{ github.token }}
+      - name: Download previously reviewed candle video
+        uses: actions/download-artifact@v4
+        with:
+          name: factual-preview-candle-35129920733
+          path: reviewed/candle
+          run-id: 35129920733
+          github-token: ${{ github.token }}
+      - name: Download previously reviewed water video
+        uses: actions/download-artifact@v4
+        with:
+          name: factual-preview-water-35129920733
+          path: reviewed/water
+          run-id: 35129920733
+          github-token: ${{ github.token }}
+      - name: Set up YouTube SDK and media inspector
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          pip install google-api-python-client==2.200.0 google-auth==2.58.0 requests==2.34.2 soundfile==0.14.0
+      - name: Verify three distinct media files and publish sequentially
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path('shorts_bot').resolve()))
+          import main
+          assert os.getenv('YOUTUBE_PRIVACY') == 'public'
+          assert all(os.getenv(k) for k in ('YT_CLIENT_ID','YT_CLIENT_SECRET','YT_REFRESH_TOKEN'))
+          expected = {'cats': 'Why Cats Knead Your Blanket #Shorts',
+                      'candle': 'Why Candle Flames Dance #Shorts',
+                      'water': 'Why Water Beads Up Into Drops #Shorts'}
+          checked = []
+          hashes = set()
+          for slug, title in expected.items():
+              folder = Path('reviewed') / slug
+              movie = folder / 'short.mp4'
+              plan = json.loads((folder / 'plan.json').read_text(encoding='utf-8'))
+              if not movie.is_file() or movie.stat().st_size < 100000:
+                  raise RuntimeError('Missing or tiny MP4 for ' + slug)
+              if plan.get('title') != title or plan.get('topic') != slug or plan.get('uploaded') is not False:
+                  raise RuntimeError('Metadata mismatch for ' + slug)
+              if len(plan.get('stock_sources', [])) < 3 or not 60 <= len(plan.get('narration','').split()) <= 110:
+                  raise RuntimeError('Incomplete factual Short plan for ' + slug)
+              probe = json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-show_entries','stream=codec_type,width,height','-of','json',str(movie)], text=True))
+              streams = probe.get('streams', [])
+              if not any(s.get('codec_type') == 'audio' for s in streams) or not any(s.get('codec_type') == 'video' and s.get('width') == 1080 and s.get('height') == 1920 for s in streams):
+                  raise RuntimeError('Invalid audio or vertical format for ' + slug)
+              if not 23 <= float(probe['format']['duration']) <= 60:
+                  raise RuntimeError('Unexpected video duration for ' + slug)
+              digest = hashlib.sha256(movie.read_bytes()).hexdigest()
+              if digest in hashes:
+                  raise RuntimeError('Duplicate movie; abort')
+              hashes.add(digest)
+              if slug == 'water':
+                  plan['description'] += ' Visuals include illustrative liquid-interface footage.'
+              checked.append((slug, movie, plan))
+              print('REVIEWED_AND_READY', slug, 'seconds=', probe['format']['duration'], 'sha256=', digest[:16], flush=True)
+          for slug, movie, plan in checked:
+              print('UPLOADING', slug, flush=True)
+              video_id = main.upload_youtube(movie, plan)
+              if not video_id:
+                  raise RuntimeError('YouTube returned no id for ' + slug)
+              print('PUBLISHED', slug, 'https://www.youtube.com/shorts/' + video_id, flush=True)
+          PY
