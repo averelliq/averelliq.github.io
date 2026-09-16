@@ -46,6 +46,11 @@ jobs:
           python -m py_compile shorts_bot/*.py
       - name: Generate complete MP4 with narration, licensed footage, captions, vision reviews; DO NOT UPLOAD
         run: python shorts_bot/quality_entry.py
+      - name: Inspect MP4 container and speech level after a successful run
+        if: success()
+        run: |
+          ffprobe -v error -show_entries format=duration,size -show_entries stream=codec_type,width,height -of json shorts_bot/output/short.mp4
+          ffmpeg -hide_banner -i shorts_bot/output/short.mp4 -vn -af volumedetect -f null - 2>&1 | grep -E 'mean_volume|max_volume' || true
       - name: Preserve actual output, plan and footage provenance even on failure
         if: always()
         uses: actions/upload-artifact@v4
