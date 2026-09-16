@@ -39,18 +39,10 @@ def run(cmd: list[str]) -> None:
 def ffprobe_duration(path: Path) -> float:
     p = subprocess.run(
         [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_entries",
-            "format=duration",
-            "-of",
-            "default=noprint_wrappers=1:nokey=1",
-            str(path),
+            "ffprobe", "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", str(path),
         ],
-        check=True,
-        capture_output=True,
-        text=True,
+        check=True, capture_output=True, text=True,
     )
     return float(p.stdout.strip())
 
@@ -90,12 +82,13 @@ Rules:
 - Every 5-8 seconds introduce a new visual or curiosity beat.
 - End with a satisfying reveal or thought, not with 'like and subscribe'.
 - Pexels search queries must be simple English visual phrases, 2-5 words, with no trademarks.
+- Description must not include URLs, website addresses, external links or promotional references.
 - Output STRICT JSON only, no markdown.
 
 JSON shape:
 {{
   "title": "under 70 characters, compelling but accurate, include #Shorts",
-  "description": "2 short English sentences",
+  "description": "2 short English sentences, no links",
   "narration": "complete voiceover",
   "tags": ["shorts", "curiosity", "..."],
   "scenes": [
@@ -117,8 +110,7 @@ Use 6-8 scenes. Make narration and scene sequence tell one coherent story.
     r = requests.post(
         url,
         headers={"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"},
-        json=payload,
-        timeout=120,
+        json=payload, timeout=120,
     )
     if not r.ok:
         die(f"Gemini API failed: {r.status_code} {r.text[:500]}")
@@ -208,7 +200,6 @@ def tts(text: str, dest: Path) -> None:
         die("Kokoro produced no audio.")
 
     import numpy as np
-
     waveform = np.concatenate(chunks)
     sf.write(dest, waveform, 24000)
 
@@ -262,26 +253,11 @@ def build_video(plan: dict[str, Any], audio_path: Path) -> Path:
         clip = WORK / f"clip_{i:02d}.mp4"
         run(
             [
-                "ffmpeg",
-                "-y",
-                "-stream_loop",
-                "-1",
-                "-i",
-                str(src),
-                "-t",
-                f"{scene_duration:.3f}",
-                "-an",
-                "-vf",
+                "ffmpeg", "-y", "-stream_loop", "-1", "-i", str(src),
+                "-t", f"{scene_duration:.3f}", "-an", "-vf",
                 "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,setsar=1",
-                "-c:v",
-                "libx264",
-                "-preset",
-                "veryfast",
-                "-crf",
-                "21",
-                "-pix_fmt",
-                "yuv420p",
-                str(clip),
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
+                "-pix_fmt", "yuv420p", str(clip),
             ]
         )
         clips.append(clip)
@@ -291,21 +267,7 @@ def build_video(plan: dict[str, Any], audio_path: Path) -> Path:
         "\n".join(f"file '{p.as_posix()}'" for p in clips), encoding="utf-8"
     )
     silent = WORK / "silent.mp4"
-    run(
-        [
-            "ffmpeg",
-            "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(concat_file),
-            "-c",
-            "copy",
-            str(silent),
-        ]
-    )
+    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file), "-c", "copy", str(silent)])
 
     srt = WORK / "captions.srt"
     write_srt(plan["narration"], duration, srt)
@@ -318,31 +280,21 @@ def build_video(plan: dict[str, Any], audio_path: Path) -> Path:
     subtitle_filter = f"subtitles={srt.as_posix()}:force_style='{style}'"
     run(
         [
-            "ffmpeg",
-            "-y",
-            "-i",
-            str(silent),
-            "-i",
-            str(audio_path),
-            "-vf",
-            subtitle_filter,
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-crf",
-            "20",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            "-shortest",
-            "-movflags",
-            "+faststart",
-            str(final),
+            "ffmpeg", "-y", "-i", str(silent), "-i", str(audio_path),
+            "-vf", subtitle_filter, "-c:v", "libx264", "-preset", "veryfast",
+            "-crf", "20", "-c:a", "aac", "-b:a", "192k", "-shortest",
+            "-movflags", "+faststart", str(final),
         ]
     )
     return final
+
+
+def clean_description(raw: str) -> str:
+    """Remove external URLs even when the language model includes one."""
+    description = re.sub(r"\[[^\]]+\]\(https?://[^)]+\)", "", raw, flags=re.I)
+    description = re.sub(r"(?i)\b(?:https?://|www\.)\S+", "", description)
+    description = re.sub(r"[ \t]{2,}", " ", description)
+    return description.strip()
 
 
 def upload_youtube(video_path: Path, plan: dict[str, Any]) -> str | None:
@@ -350,8 +302,7 @@ def upload_youtube(video_path: Path, plan: dict[str, Any]) -> str | None:
     client_secret = os.getenv("YT_CLIENT_SECRET", "").strip()
     refresh_token = os.getenv("YT_REFRESH_TOKEN", "").strip()
     if not (client_id and client_secret and refresh_token):
-        print("YouTube OAuth secrets are not configured; video generation succeeded, upload skipped.")
-        return None
+        die("YouTube OAuth secrets are missing; upload cannot run automatically.")
 
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
@@ -370,8 +321,9 @@ def upload_youtube(video_path: Path, plan: dict[str, Any]) -> str | None:
     creds.refresh(Request())
     youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
 
-    description = str(plan.get("description", "")).strip()
-    description += "\n\nFootage provided by Pexels: https://www.pexels.com/\n#Shorts"
+    description = clean_description(str(plan.get("description", "")))
+    if "#shorts" not in description.lower():
+        description = (description + "\n\n#Shorts").strip()
     tags = [str(t)[:30] for t in (plan.get("tags") or [])][:15]
     if "shorts" not in [t.lower() for t in tags]:
         tags.append("shorts")
