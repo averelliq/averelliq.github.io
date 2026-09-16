@@ -79,7 +79,7 @@ jobs:
 
       - name: Preflight checks
         run: |
-          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py
+          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py shorts_bot/visual_guard.py shorts_bot/quality_entry.py
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
           python - <<'PY'
@@ -88,8 +88,8 @@ jobs:
           print('Python imports OK')
           PY
 
-      - name: Generate Short (upload disabled in smoke test)
-        run: python shorts_bot/upgrade.py
+      - name: Generate and visually review Short (upload disabled in smoke test)
+        run: python shorts_bot/quality_entry.py
 
       - name: Save generated Short for debugging
         if: always()
