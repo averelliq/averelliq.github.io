@@ -2,6 +2,15 @@ name: Global Shorts Bot
 
 on:
   workflow_dispatch:
+    inputs:
+      smoke_test:
+        description: Generate a video without uploading to YouTube
+        required: false
+        type: boolean
+        default: false
+  push:
+    paths:
+      - '.github/workflows/global-shorts.yml'
   schedule:
     # UTC cron; Türkiye time: 08:15, 16:15, 00:15 (next calendar day).
     - cron: "15 5 * * *"
@@ -28,6 +37,7 @@ jobs:
       YOUTUBE_PRIVACY: public
       GEMINI_MODEL: gemini-3.6-flash
       TTS_VOICE: am_michael
+      SHORTS_SKIP_UPLOAD: ${{ github.event_name == 'push' || inputs.smoke_test == true && '1' || '0' }}
 
     steps:
       - name: Checkout
@@ -59,7 +69,7 @@ jobs:
 
       - name: Preflight checks
         run: |
-          python -m py_compile shorts_bot/main.py
+          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
           python - <<'PY'
@@ -68,8 +78,8 @@ jobs:
           print('Python imports OK')
           PY
 
-      - name: Generate and upload Short
-        run: python shorts_bot/main.py
+      - name: Generate Short (upload disabled in smoke test)
+        run: python shorts_bot/retry_runner.py
 
       - name: Save generated Short for debugging
         if: always()
