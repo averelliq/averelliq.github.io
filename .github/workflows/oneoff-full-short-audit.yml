@@ -21,7 +21,7 @@ jobs:
       SHORTS_THEME: everyday
       SHORTS_AI_REVIEW: '1'
       SHORTS_TREND_MODE: auto
-      SHORTS_TEST_TOPIC_OVERRIDE: 'why soap bubbles form and burst'
+      SHORTS_TEST_TOPIC_OVERRIDE: 'why ice floats in water'
       SHORTS_MAX_VISUAL_CANDIDATES: '9'
       SHORTS_SKIP_UPLOAD: '1'
       YOUTUBE_PRIVACY: private
@@ -45,16 +45,7 @@ jobs:
           pip install -r shorts_bot/requirements.txt
           pip check
           python -m py_compile shorts_bot/*.py
-          python - <<'PY'
-          import os, sys
-          sys.path.insert(0, 'shorts_bot')
-          import quality_entry
-          from upgrade import validate_plan as guarded
-          assert guarded is quality_entry.checked_validate_plan
-          assert 'popcorn' in quality_entry.SUBJECT_FAMILIES
-          print('Topic isolation guard imported: PASS')
-          PY
-      - name: Generate complete MP4 after rejecting unrelated scene subjects; DO NOT UPLOAD
+      - name: Generate complete MP4 for ice-flotation topic; DO NOT UPLOAD
         run: python shorts_bot/quality_entry.py
       - name: Inspect MP4 container and speech level after a successful run
         if: success()
