@@ -44,7 +44,7 @@ jobs:
           pip install -r shorts_bot/requirements.txt
           pip check
           python -m py_compile shorts_bot/*.py
-      - name: Generate complete MP4 with narration, licensed footage, captions, vision reviews; DO NOT UPLOAD
+      - name: Generate complete MP4 after structural draft repair; DO NOT UPLOAD
         run: python shorts_bot/quality_entry.py
       - name: Inspect MP4 container and speech level after a successful run
         if: success()
