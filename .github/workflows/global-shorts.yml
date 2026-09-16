@@ -24,31 +24,18 @@ on:
     - cron: "15 5 * * *"
     - cron: "15 13 * * *"
     - cron: "15 21 * * *"
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/launch-three.yml
 
 permissions:
   contents: read
 
 concurrency:
-  group: global-shorts-bot-${{ github.event_name == 'push' && 'three-launch' || 'regular' }}
+  group: global-shorts-bot
   cancel-in-progress: false
 
 jobs:
   create-short:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        theme: [science, history, everyday]
-        exclude:
-          - theme: history
-            single: true
-          - theme: everyday
-            single: true
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
@@ -58,7 +45,7 @@ jobs:
       YOUTUBE_PRIVACY: public
       GEMINI_MODEL: gemini-3.6-flash
       TTS_VOICE: am_michael
-      SHORTS_THEME: ${{ github.event_name == 'push' && matrix.theme || inputs.theme || 'auto' }}
+      SHORTS_THEME: ${{ inputs.theme || 'auto' }}
       SHORTS_AI_REVIEW: '1'
       SHORTS_SKIP_UPLOAD: ${{ inputs.smoke_test == true && '1' || '0' }}
 
@@ -108,7 +95,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: latest-short-${{ github.run_id }}-${{ matrix.theme }}
+          name: latest-short-${{ github.run_id }}
           path: |
             shorts_bot/output/short.mp4
             shorts_bot/output/plan.json
