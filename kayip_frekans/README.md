@@ -28,7 +28,7 @@ Kaynak: https://docs.github.com/en/actions/concepts/billing-and-usage , https://
 
 Workflow artık `cloud_v3.py` çalıştırır. Önceki V2 kaynakları korunur.
 
-- Yalnızca ücretsiz yerel Qwen modeli kullanılır. Her bölümün kelime sınırı, tamamlanmış son cümlesi, tekrarı ve bilinen hatalı kalıpları denetlenir. Başarısız metin en çok üç kez yeniden yazdırılır. Ayrı editör çağrısı somut sorunları raporlar; bu mekanik/AI kontrol insan okuması yerine geçmez. Uzun metin editörünün kapsamı raporda belirtilir.
+- V3, ücretsiz yerel Gemma 3 4B modelini kullanır; ağır Qwen 7B denemesinin süre/uzunluk sorunundan sonra değiştirilmiştir. Her bölümün kelime sınırı, tamamlanmış son cümlesi, tekrarı ve bilinen hatalı kalıpları denetlenir. Başarısız metin en çok üç kez yeniden yazdırılır. Ayrı editör çağrısı somut sorunları raporlar; bu mekanik/AI kontrol insan okuması yerine geçmez. Uzun metin editörünün kapsamı raporda belirtilir.
 - Kanalın mevcut sesli giriş metni korunur. Test artık 180–280 kelimelik hikâye ve giriş içerir; 65–180 saniye dışında kalan test başarılı sayılmaz.
 - Tam üretim, hedef sürenin %90–110 aralığında olmalıdır. Örneğin 30 dakika hedefinde 27–33 dakika. Ses uzatılmaz, boşlukla doldurulmaz; sınır dışı içerik hata olarak kaydedilir.
 - Ücretsiz Pexels API ile yüksek çözünürlüklü fotoğraflar alınır. Mevcut `PEXELS_API_KEY` deposu secret'ı kullanılır. Fotoğraf açıklamasında konu eşleşmesi aranır; insan portreleri filtrelenir. Uygun fotoğraf yoksa çizim/rasgele fotoğrafla başarı taklidi yapılmaz. Mekân ve nesneler temsili stok görüntülerdir; anlatılan evin birebir rekonstrüksiyonu veya fotogerçekçi AI karakter sürekliliği vaat edilmez.

@@ -38,11 +38,14 @@ def request_json(url, data=None, headers=None, timeout=180):
 
 
 def ask(prompt, structured=False):
-    payload={'model':bot.MODEL,'stream':False,'keep_alive':'10m',
+    payload={'model':'gemma3:4b','stream':False,'keep_alive':'10m',
         'messages':[{'role':'system','content':SYSTEM},{'role':'user','content':prompt}],
-        'options':{'num_ctx':8192,'num_predict':3200,'temperature':0.72,'repeat_penalty':1.12}}
+        'options':{'num_ctx':6144,'num_predict':1800,'num_thread':4,'temperature':0.72,'repeat_penalty':1.12}}
     if structured: payload['format']='json'
-    result=request_json('http://127.0.0.1:11434/api/chat',payload,timeout=1500)
+    started=time.monotonic()
+    print('Model yanıtı bekleniyor.',flush=True)
+    result=request_json('http://127.0.0.1:11434/api/chat',payload,timeout=600)
+    print(f'Model yanıtı {time.monotonic()-started:.1f}s içinde geldi.',flush=True)
     if result.get('done_reason')=='length': raise ValueError('Metin token sınırında kesildi.')
     text=result['message']['content'].strip()
     return json.loads(text) if structured else text
@@ -67,11 +70,12 @@ def write_passage(prompt, minimum, maximum):
     feedback=''
     for attempt in range(3):
         try:
-            text=ask(prompt+f'\nZORUNLU: {minimum}-{maximum} kelime. En az altı dolu paragraf yaz. '
+            text=ask(prompt+f'\nZORUNLU: {minimum}-{maximum} kelime. Dört veya beş dolu paragraf yaz. '
                      'Özet değil, olayları sahnelerle anlat. Sadece okunacak hikâye metni.\n'+feedback)
+            save(f'draft-{time.time_ns()}.txt',text)
             return check_passage(text,minimum,maximum)
         except (ValueError,KeyError) as exc:
-            feedback=f'Önceki denemenin hatası: {exc}. Baştan eksiksiz düzelt.'
+            feedback=f'Önceki denemenin hatası: {exc}. Yukarıdaki konu için aşağıdaki taslağı verilen kelime aralığına KISALT veya geliştir. Başlık yazma. TASLAK: '+locals().get('text','')[:5000]
             print(f'Metin yeniden yazılıyor ({attempt+1}/3): {exc}',flush=True)
     raise ValueError('Üç denemede yeterli hikâye üretilemedi; kısa video başarılı sayılmadı.')
 

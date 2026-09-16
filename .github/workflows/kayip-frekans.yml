@@ -70,7 +70,7 @@ jobs:
             if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
             sleep 2
           done
-          ollama pull qwen2.5:7b
+          ollama pull gemma3:4b
       - name: Hikaye yaz ve editor kontrolunden gecir
         timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.test != true && 120 || 15 }}
         run: |
@@ -110,3 +110,4 @@ jobs:
             output/credits.txt
             output/plan.json
             output/state.json
+            output/draft-*.txt
