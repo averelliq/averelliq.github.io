@@ -13,6 +13,11 @@ _original_build = upgrade.aligned_build_video
 _original_choose_topic = upgrade.choose_topic
 _original_generate_plan = upgrade.generate_plan
 _original_model_json = upgrade.model_json
+_original_die = upgrade.bot.die
+
+
+class EditorialRejected(Exception):
+    """An editor's rejection with its original actionable factual feedback."""
 
 
 def safe_render(command: list[str]) -> None:
@@ -31,11 +36,10 @@ def safe_render(command: list[str]) -> None:
 
 
 def trend_topic(theme: str) -> str:
-    # A fixed test subject is allowed ONLY when uploads are explicitly disabled.
     test_topic = os.getenv("SHORTS_TEST_TOPIC_OVERRIDE", "").strip()
     if test_topic and os.getenv("SHORTS_SKIP_UPLOAD") == "1":
         if not 8 <= len(test_topic) <= 90 or any(c in test_topic for c in "\r\n<>#"):
-            upgrade.bot.die("Invalid smoke-test subject")
+            _original_die("Invalid smoke-test subject")
         print(f"SMOKE TEST: testing visually accessible topic: {test_topic}", flush=True)
         return test_topic
     return trend_ideas.pick_topic(theme, _original_choose_topic, upgrade.model_json)
@@ -43,7 +47,6 @@ def trend_topic(theme: str) -> str:
 
 def trend_plan():
     feedback = ""
-    plan = None
     for attempt in range(3):
         def reviewed_model_json(prompt: str):
             if prompt.startswith("You are an English-language, original educational Shorts scriptwriter."):
@@ -61,22 +64,29 @@ def trend_plan():
                                "surrounding scenes; do not repeat the rejected claim.")
             return _original_model_json(prompt)
 
+        def review_aware_die(message: str, code: int = 1):
+            marker = "AI editorial check rejected this Short: "
+            if isinstance(message, str) and message.startswith(marker):
+                raise EditorialRejected(message[len(marker):][:600])
+            return _original_die(message, code)
+
         upgrade.model_json = reviewed_model_json
+        upgrade.bot.die = review_aware_die
         try:
             plan = _original_generate_plan()
             break
-        except SystemExit as exc:
-            detail = str(exc)
-            marker = "AI editorial check rejected this Short: "
-            if marker not in detail or attempt == 2:
-                raise
-            feedback = detail.split(marker, 1)[1][:600]
-            print(f"Editorial review rejected draft {attempt + 1}/3; rewriting with factual feedback.",
+        except EditorialRejected as exc:
+            if attempt == 2:
+                _original_die("Three editor-rejected drafts; upload cancelled. Last issues: " + str(exc))
+            feedback = str(exc)
+            print(f"Editorial review rejected draft {attempt + 1}/3; rewriting with factual feedback: {feedback}",
                   flush=True)
         finally:
             upgrade.model_json = _original_model_json
-    if plan is None:
-        upgrade.bot.die("No editor-approved plan; upload cancelled")
+            upgrade.bot.die = _original_die
+    else:
+        _original_die("No editor-approved plan; upload cancelled")
+
     ref = trend_ideas.reference_for(plan["theme"])
     if ref:
         plan["trend_reference"] = ref
