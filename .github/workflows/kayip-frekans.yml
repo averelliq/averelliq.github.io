@@ -1,0 +1,75 @@
+name: KAYIP FREKANS - Ucretsiz Video Botu
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: Hikaye konusu
+        default: Köy evinin kapısından ölmüş kardeşimin sesini duydum
+        type: string
+      minutes:
+        description: Hedef dakika (5-35; gerçek süre seslendirmeye bağlı)
+        default: '30'
+        type: string
+      test:
+        description: Sadece kısa üretim testi
+        default: false
+        type: boolean
+  push:
+    paths:
+      - kayip_frekans/**
+      - .github/workflows/kayip-frekans.yml
+permissions:
+  contents: read
+concurrency:
+  group: kayip-frekans
+  cancel-in-progress: false
+jobs:
+  video:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      STORY_TOPIC: ${{ inputs.topic }}
+      TARGET_MINUTES: ${{ inputs.minutes || '30' }}
+      SHORT_TEST: ${{ github.event_name == 'push' || inputs.test }}
+      OLLAMA_HOST: 127.0.0.1:11434
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Ucretsiz araclari GitHub sunucusuna kur
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          pip install -r kayip_frekans/requirements.txt
+          curl --fail --location --retry 3 https://ollama.com/install.sh -o /tmp/install-ollama.sh
+          sh /tmp/install-ollama.sh
+          ollama serve >/tmp/ollama.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
+            sleep 2
+          done
+          ollama pull qwen2.5:7b
+          python -m piper.download_voices tr_TR-fettah-medium
+      - name: Hikaye ses altyazi ve video uret
+        run: |
+          if [ "$SHORT_TEST" = "true" ]; then
+            python -u kayip_frekans/bot.py --smoke
+          else
+            python -u kayip_frekans/bot.py
+          fi
+      - name: Hazir videoyu indirilebilir yap
+        uses: actions/upload-artifact@v4
+        with:
+          name: KAYIP-FREKANS-${{ github.run_number }}
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            output/final.mp4
+            output/thumbnail.jpg
+            output/story.txt
+            output/captions.srt
+            output/metadata.json
+            output/validation.json
