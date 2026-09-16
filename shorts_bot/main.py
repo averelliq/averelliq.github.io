@@ -69,34 +69,36 @@ def generate_plan() -> dict[str, Any]:
     seed = f"{os.getenv('GITHUB_RUN_ID', 'local')}-{random.randint(1000, 999999)}"
     prompt = f"""
 You create high-retention English YouTube Shorts for a broad international audience.
-Create ONE original evergreen curiosity Short. Seed: {seed}.
+Create ONE original evergreen curiosity Short optimized for strong retention. Seed: {seed}.
 
 Rules:
-- 34-48 seconds spoken length, about 95-125 words.
-- Hook in the first sentence; no greeting, no channel intro.
+- 28-38 seconds spoken length, about 72-92 words.
+- The FIRST sentence must be an ultra-strong hook of 5-12 words.
+- The first 2 seconds must feel instantly gripping. No greeting, no slow setup, no channel intro.
+- Start with the most surprising fact, image, or question immediately.
 - Topic must be safe, brand-safe, evergreen and visually searchable in stock footage.
 - Prefer space, animals, nature, engineering, geography, ancient history, everyday science, or surprising objects.
 - No politics, elections, medical advice, finance advice, dangerous challenges, graphic violence, sexual content, copyrighted characters, celebrity gossip, or breaking news.
 - Do not invent precise statistics, quotes, records, or disputed claims. If a fact is uncertain, do not use it.
-- Make each sentence easy for a natural English narrator to read.
-- Every 5-8 seconds introduce a new visual or curiosity beat.
-- End with a satisfying reveal or thought, not with 'like and subscribe'.
+- Use short punchy sentences. Keep the language easy for a natural English narrator.
+- Every 3-5 seconds introduce a new visual or curiosity beat.
+- End with a satisfying reveal or twist, not with 'like and subscribe'.
 - Pexels search queries must be simple English visual phrases, 2-5 words, with no trademarks.
 - Description must not include URLs, website addresses, external links or promotional references.
 - Output STRICT JSON only, no markdown.
 
 JSON shape:
 {{
-  "title": "under 70 characters, compelling but accurate, include #Shorts",
+  "title": "under 65 characters, compelling but accurate, include #Shorts",
   "description": "2 short English sentences, no links",
   "narration": "complete voiceover",
   "tags": ["shorts", "curiosity", "..."],
   "scenes": [
-    {{"query": "stock footage search", "caption": "3-7 word on-screen idea"}}
+    {{"query": "stock footage search", "caption": "2-5 word on-screen idea"}}
   ]
 }}
 
-Use 6-8 scenes. Make narration and scene sequence tell one coherent story.
+Use 8-10 scenes. Make narration and scene sequence tell one coherent story.
 """.strip()
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
@@ -124,7 +126,7 @@ Use 6-8 scenes. Make narration and scene sequence tell one coherent story.
 
     narration = str(plan.get("narration", "")).strip()
     scenes = plan.get("scenes") or []
-    if len(narration.split()) < 70 or not isinstance(scenes, list) or len(scenes) < 4:
+    if len(narration.split()) < 55 or not isinstance(scenes, list) or len(scenes) < 7:
         die(f"Gemini returned an incomplete plan: {plan}")
     return plan
 
@@ -194,7 +196,7 @@ def tts(text: str, dest: Path) -> None:
 
     pipeline = KPipeline(lang_code="a")
     chunks = []
-    for _gs, _ps, audio in pipeline(text, voice=TTS_VOICE, speed=1.03):
+    for _gs, _ps, audio in pipeline(text, voice=TTS_VOICE, speed=1.06):
         chunks.append(audio)
     if not chunks:
         die("Kokoro produced no audio.")
@@ -209,7 +211,7 @@ def split_captions(text: str, duration: float) -> list[tuple[float, float, str]]
     groups: list[list[str]] = []
     i = 0
     while i < len(words):
-        n = 6 if len(words) - i > 7 else len(words) - i
+        n = 4 if len(words) - i > 5 else len(words) - i
         groups.append(words[i : i + n])
         i += n
 
@@ -263,9 +265,7 @@ def build_video(plan: dict[str, Any], audio_path: Path) -> Path:
         clips.append(clip)
 
     concat_file = WORK / "concat.txt"
-    concat_file.write_text(
-        "\n".join(f"file '{p.as_posix()}'" for p in clips), encoding="utf-8"
-    )
+    concat_file.write_text("\n".join(f"file '{p.as_posix()}'" for p in clips), encoding="utf-8")
     silent = WORK / "silent.mp4"
     run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file), "-c", "copy", str(silent)])
 
