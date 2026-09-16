@@ -21,7 +21,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "").strip()
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash").strip()
 TTS_VOICE = os.getenv("TTS_VOICE", "am_michael").strip()
 YOUTUBE_PRIVACY = os.getenv("YOUTUBE_PRIVACY", "public").strip()
 
@@ -111,14 +111,14 @@ Use 6-8 scenes. Make narration and scene sequence tell one coherent story.
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "maxOutputTokens": 1800,
+            "maxOutputTokens": 8192,
         },
     }
     r = requests.post(
         url,
         headers={"x-goog-api-key": GEMINI_API_KEY, "Content-Type": "application/json"},
         json=payload,
-        timeout=90,
+        timeout=120,
     )
     if not r.ok:
         die(f"Gemini API failed: {r.status_code} {r.text[:500]}")
@@ -127,7 +127,8 @@ Use 6-8 scenes. Make narration and scene sequence tell one coherent story.
         text = data["candidates"][0]["content"]["parts"][0]["text"]
         plan = extract_json(text)
     except Exception as exc:
-        die(f"Could not parse Gemini response: {exc}; response={data}")
+        finish_reason = ((data.get("candidates") or [{}])[0]).get("finishReason")
+        die(f"Could not parse Gemini response: {exc}; finishReason={finish_reason}; response={data}")
 
     narration = str(plan.get("narration", "")).strip()
     scenes = plan.get("scenes") or []
