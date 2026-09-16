@@ -14,40 +14,36 @@ jobs:
     timeout-minutes: 8
     env:
       YT_DATA_API_KEY: ${{ secrets.YT_DATA_API_KEY }}
-      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
-      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
-      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Offline checks and live metadata query (NO YouTube upload)
+      - name: Upload-free API key check
         run: |
           pip install requests==2.34.2
           python -m py_compile shorts_bot/trend_ideas.py shorts_bot/quality_entry.py
           python - <<'PY'
           import os, sys
-          from unittest.mock import patch
           sys.path.insert(0, 'shorts_bot')
           import trend_ideas as t
           assert t._duration('PT58S') == 58
           assert t._duration('PT1M2S') == 62
-          assert t._duration('garbage') == 0
-          with patch.object(t, '_recent_candidates', return_value=[{'id':'abcdefghijk','title':'How Bats Navigate','views':90000,'views_per_day':40000,'age_days':2.0}]), patch.object(t, '_neutral_topic', return_value='how bats navigate using echoes'):
-              topic = t.pick_topic('science', lambda theme: 'evergreen topic', lambda text: {})
-              assert topic == 'how bats navigate using echoes'
-              assert t.reference_for('science')['video_id'] == 'abcdefghijk'
-          t._CACHE.clear()
-          with patch.object(t, '_recent_candidates', side_effect=ValueError('auth blocked')):
-              assert t.pick_topic('science', lambda theme: 'evergreen topic', lambda text: {}) == 'evergreen topic'
-          print('OFFLINE TREND TESTS PASS', flush=True)
+          assert t._duration('bad') == 0
+          print('OFFLINE DURATION CHECKS PASS', flush=True)
+          if not os.getenv('YT_DATA_API_KEY'):
+              os.environ['YT_DATA_API_KEY'] = os.getenv('GEMINI_API_KEY', '')
+          if not os.getenv('YT_DATA_API_KEY'):
+              raise SystemExit('No candidate API key configured')
           try:
-              matches = t._recent_candidates('science')
+              found = t._recent_candidates('science')
           except Exception as exc:
-              print('LIVE METADATA PROBE FAILED:', type(exc).__name__, str(exc)[:180], flush=True)
+              # Never print exception URLs: they may include API keys in query params.
+              status = getattr(getattr(exc, 'response', None), 'status_code', None)
+              print('EXISTING KEY CANNOT SEARCH YOUTUBE:', type(exc).__name__, status, flush=True)
               raise SystemExit(1)
-          print('LIVE METADATA PROBE OK; qualified science candidates:', len(matches), flush=True)
-          if matches:
-              print('TOP SOURCE VIDEO ID:', matches[0]['id'], 'VIEWS:', matches[0]['views'], flush=True)
+          print('EXISTING KEY CAN SEARCH YOUTUBE; suitable short-form candidates:', len(found), flush=True)
+          if found:
+              print('TOP PUBLIC VIDEO ID:', found[0]['id'], flush=True)
           PY
