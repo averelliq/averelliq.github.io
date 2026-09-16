@@ -191,12 +191,12 @@ def produce(title, parts, smoke):
         '-c','copy',OUT/'joined.mp4')
     # Quiet original synthesized ambience, speech loudness normalization and Unicode subtitles.
     filters=("[0:v]subtitles=output/captions.srt:force_style='FontName=DejaVu Sans,FontSize=24,"
-        "Outline=2,Shadow=1,MarginV=36'[v];[0:a]loudnorm=I=-16:TP=-1.5:LRA=9[s];"
+        "Outline=2,Shadow=1,MarginV=36'[v];[0:a]aformat=sample_rates=44100,alimiter=limit=0.9:level=false[s];"
         "[1:a]volume=0.025[bg];[s][bg]amix=inputs=2:duration=first:normalize=0[a]")
     run('ffmpeg','-hide_banner','-loglevel','error','-y','-i',OUT/'joined.mp4',
         '-f','lavfi','-i','anoisesrc=color=brown:amplitude=0.15:sample_rate=44100',
         '-filter_complex',filters,'-map','[v]','-map','[a]','-c:v','libx264','-preset','veryfast',
-        '-crf','24','-c:a','aac','-b:a','160k','-movflags','+faststart','-shortest',OUT/'final.mp4')
+        '-crf','24','-c:a','aac','-b:a','160k','-movflags','+faststart','-t',f'{total:.4f}',OUT/'final.mp4')
     probe=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_format','-show_streams','-of','json',str(OUT/'final.mp4')]))
     kinds={s['codec_type'] for s in probe['streams']}
     measured=float(probe['format']['duration'])
