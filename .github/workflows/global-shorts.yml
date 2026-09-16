@@ -25,7 +25,7 @@ jobs:
       YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
       YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
-      YOUTUBE_PRIVACY: public
+      YOUTUBE_PRIVACY: private
       GEMINI_MODEL: gemini-2.5-flash
       TTS_VOICE: am_michael
 
