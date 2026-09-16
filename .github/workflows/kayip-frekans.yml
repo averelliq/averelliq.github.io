@@ -36,16 +36,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Test bagimliliklari
+        run: pip install Pillow==11.3.0
       - name: Turkce giris ve kalite testleri
         run: python -m unittest discover -s kayip_frekans -p 'test_*.py' -v
       - name: Python sozdizimi
-        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/quality.py
+        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/quality.py
   video:
-    if: github.event.repository.private == false
+    if: github.event.repository.private == false && github.event_name != 'pull_request'
     needs: quality
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       STORY_TOPIC: ${{ inputs.topic }}
       TARGET_MINUTES: ${{ inputs.minutes || '30' }}
       SHORT_TEST: ${{ github.event_name != 'workflow_dispatch' || inputs.test }}
@@ -71,17 +74,18 @@ jobs:
       - name: Hikaye giris ses altyazi ve video uret
         run: |
           if [ "$SHORT_TEST" = "true" ]; then
-            python -u kayip_frekans/cloud_v2.py --smoke
+            python -u kayip_frekans/cloud_v3.py --smoke
           else
-            python -u kayip_frekans/cloud_v2.py
+            python -u kayip_frekans/cloud_v3.py
           fi
       - name: Hazir videoyu indirilebilir yap
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: KAYIP-FREKANS-${{ github.run_number }}
           retention-days: 1
           compression-level: 0
-          if-no-files-found: error
+          if-no-files-found: warn
           path: |
             output/final.mp4
             output/thumbnail.jpg
@@ -92,3 +96,9 @@ jobs:
             output/metadata.json
             output/validation.json
             output/quality_report.json
+
+            output/scene_plan.json
+            output/shots.json
+            output/visual_sources.json
+            output/credits.txt
+            output/plan.json
