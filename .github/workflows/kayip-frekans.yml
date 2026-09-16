@@ -41,7 +41,7 @@ jobs:
       - name: Turkce giris ve kalite testleri
         run: python -m unittest discover -s kayip_frekans -p 'test_*.py' -v
       - name: Python sozdizimi
-        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/cloud_v4.py kayip_frekans/cloud_v5.py kayip_frekans/cloud_v6.py kayip_frekans/cloud_v7.py kayip_frekans/cloud_v8.py kayip_frekans/cloud_v9.py kayip_frekans/cloud_v10.py kayip_frekans/quality.py
+        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/cloud_v4.py kayip_frekans/cloud_v5.py kayip_frekans/cloud_v6.py kayip_frekans/cloud_v7.py kayip_frekans/cloud_v8.py kayip_frekans/cloud_v9.py kayip_frekans/cloud_v10.py kayip_frekans/cloud_v11.py kayip_frekans/quality.py
   video:
     if: github.event.repository.private == false && github.event_name != 'pull_request'
     needs: quality
@@ -53,7 +53,7 @@ jobs:
       TARGET_MINUTES: ${{ inputs.minutes || '30' }}
       SHORT_TEST: ${{ github.event_name != 'workflow_dispatch' || inputs.test }}
       FAST_VISUAL_SMOKE: ${{ github.event_name == 'push' && '1' || '0' }}
-      DOCUMENTARY_SHOT_SECONDS: '23'
+      DOCUMENTARY_SHOT_SECONDS: '20'
       OLLAMA_HOST: 127.0.0.1:11434
     steps:
       - uses: actions/checkout@v4
@@ -81,16 +81,16 @@ jobs:
         timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.test != true && 120 || 15 }}
         run: |
           if [ "$SHORT_TEST" = "true" ]; then
-            python -u kayip_frekans/cloud_v10.py --stage story --smoke
+            python -u kayip_frekans/cloud_v11.py --stage story --smoke
           else
-            python -u kayip_frekans/cloud_v10.py --stage story
+            python -u kayip_frekans/cloud_v11.py --stage story
           fi
-      - name: Turkce ses ve noktalama korumali altyazi
+      - name: Turkce ses ve kompakt altyazi
         timeout-minutes: 30
-        run: python -u kayip_frekans/cloud_v10.py --stage narration
-      - name: Belgesel tempolu 1080p cevre B-roll montaji
+        run: python -u kayip_frekans/cloud_v11.py --stage narration
+      - name: Anadolu oncelikli 1080p belgesel B-roll montaji
         timeout-minutes: 60
-        run: python -u kayip_frekans/cloud_v10.py --stage render
+        run: python -u kayip_frekans/cloud_v11.py --stage render
       - name: Hazir videoyu indirilebilir yap
         if: always()
         uses: actions/upload-artifact@v4
