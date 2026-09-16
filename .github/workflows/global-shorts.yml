@@ -8,9 +8,6 @@ on:
         required: false
         type: boolean
         default: false
-  push:
-    paths:
-      - '.github/workflows/global-shorts.yml'
   schedule:
     # UTC cron; Türkiye time: 08:15, 16:15, 00:15 (next calendar day).
     - cron: "15 5 * * *"
@@ -37,7 +34,7 @@ jobs:
       YOUTUBE_PRIVACY: public
       GEMINI_MODEL: gemini-3.6-flash
       TTS_VOICE: am_michael
-      SHORTS_SKIP_UPLOAD: ${{ (github.event_name == 'push' || inputs.smoke_test == true) && '1' || '0' }}
+      SHORTS_SKIP_UPLOAD: ${{ inputs.smoke_test == true && '1' || '0' }}
 
     steps:
       - name: Checkout
