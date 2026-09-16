@@ -3,7 +3,7 @@ name: Global Shorts Bot
 on:
   workflow_dispatch:
   schedule:
-    # GitHub cron uses UTC. These are 08:15, 16:15 and 00:15 in Türkiye (UTC+3).
+    # UTC cron; Türkiye time: 08:15, 16:15, 00:15 (next calendar day).
     - cron: "15 5 * * *"
     - cron: "15 13 * * *"
     - cron: "15 21 * * *"
@@ -25,7 +25,7 @@ jobs:
       YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
       YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
-      YOUTUBE_PRIVACY: private
+      YOUTUBE_PRIVACY: public
       GEMINI_MODEL: gemini-3.6-flash
       TTS_VOICE: am_michael
 
