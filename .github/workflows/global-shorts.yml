@@ -8,8 +8,19 @@ on:
         required: false
         type: boolean
         default: false
+      theme:
+        description: Choose a content format (auto cycles; scheduled runs have fixed themes)
+        required: false
+        type: choice
+        options:
+          - auto
+          - science
+          - history
+          - everyday
+        default: auto
   schedule:
     # UTC cron; Türkiye time: 08:15, 16:15, 00:15 (next calendar day).
+    # 08:15 science, 16:15 history, 00:15 everyday.
     - cron: "15 5 * * *"
     - cron: "15 13 * * *"
     - cron: "15 21 * * *"
@@ -34,6 +45,8 @@ jobs:
       YOUTUBE_PRIVACY: public
       GEMINI_MODEL: gemini-3.6-flash
       TTS_VOICE: am_michael
+      SHORTS_THEME: ${{ inputs.theme || 'auto' }}
+      SHORTS_AI_REVIEW: '1'
       SHORTS_SKIP_UPLOAD: ${{ inputs.smoke_test == true && '1' || '0' }}
 
     steps:
@@ -66,7 +79,7 @@ jobs:
 
       - name: Preflight checks
         run: |
-          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py
+          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
           python - <<'PY'
@@ -76,7 +89,7 @@ jobs:
           PY
 
       - name: Generate Short (upload disabled in smoke test)
-        run: python shorts_bot/retry_runner.py
+        run: python shorts_bot/upgrade.py
 
       - name: Save generated Short for debugging
         if: always()
@@ -86,5 +99,6 @@ jobs:
           path: |
             shorts_bot/output/short.mp4
             shorts_bot/output/plan.json
+            shorts_bot/output/visual_sources.json
           if-no-files-found: ignore
           retention-days: 3
