@@ -1,4 +1,4 @@
-name: Launch Three Public Shorts
+name: Launch Remaining Two Public Shorts
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        theme: [science, history, everyday]
+        theme: [history, everyday]
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
@@ -56,7 +56,7 @@ jobs:
           pip check
       - name: Preflight checks
         run: |
-          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py
+          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py shorts_bot/retry_editorial.py
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
           python - <<'PY'
@@ -65,7 +65,7 @@ jobs:
           print('Python imports OK')
           PY
       - name: Create and publish public Short
-        run: python shorts_bot/upgrade.py
+        run: python shorts_bot/retry_editorial.py
       - name: Save generated Short for debugging
         if: always()
         uses: actions/upload-artifact@v4
