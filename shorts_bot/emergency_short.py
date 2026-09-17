@@ -1,8 +1,7 @@
-"""Emergency one-shot Shorts path used only when the AI generation run fails.
+"""Emergency one-shot Shorts path used when the AI generation run fails.
 
-It avoids Gemini entirely, checks the public channel first to prevent a duplicate,
-then produces a deterministic educational Short with Kokoro + Pexels + FFmpeg and
-uploads it through the existing YouTube OAuth uploader.
+For a manually verified missed upload, EMERGENCY_FORCE_UPLOAD=1 skips the public
+channel duplicate lookup. Normal emergency use stays fail-closed.
 """
 from __future__ import annotations
 
@@ -15,7 +14,7 @@ import requests
 
 import main as bot
 
-CHANNEL_ID = os.getenv("YT_CHANNEL_ID", "UCLvnQcgUZ6Y0lcpilbHuw1g").strip()
+CHANNEL_ID = os.getenv("YT_CHANNEL_ID", "").strip()
 
 PLAN = {
     "title": "Why Soap Beats Grease So Easily #Shorts",
@@ -44,10 +43,12 @@ PLAN = {
 
 
 def recent_upload_exists() -> bool:
+    if os.getenv("EMERGENCY_FORCE_UPLOAD", "0").strip() == "1":
+        print("FORCED ONE-SHOT: prior failed runs verified; duplicate lookup skipped.", flush=True)
+        return False
     key = os.getenv("YT_DATA_API_KEY", "").strip()
     if not key or not CHANNEL_ID:
-        print("Emergency duplicate check unavailable; refusing to upload without proof.", flush=True)
-        raise SystemExit(1)
+        raise RuntimeError("Emergency duplicate check unavailable; publishing blocked")
     threshold_raw = os.getenv("EMERGENCY_NOT_BEFORE", "").strip()
     threshold = (
         datetime.fromisoformat(threshold_raw.replace("Z", "+00:00"))
@@ -91,6 +92,8 @@ def main() -> None:
     bot.tts(PLAN["narration"], audio)
     final = bot.build_video(PLAN, audio)
     video_id = bot.upload_youtube(final, PLAN)
+    if not video_id:
+        raise RuntimeError("YouTube upload returned no video id")
     print(f"EMERGENCY UPLOAD COMPLETE: {video_id}", flush=True)
 
 
