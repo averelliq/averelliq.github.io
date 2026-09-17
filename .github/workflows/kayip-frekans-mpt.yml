@@ -1,0 +1,109 @@
+name: KAYIP FREKANS - MoneyPrinterTurbo Deneme
+on:
+  push:
+    paths:
+      - kayip_frekans/mpt_bridge.py
+      - kayip_frekans/test_mpt_bridge.py
+      - .github/workflows/kayip-frekans-mpt.yml
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Onayli hikaye, tam anlatim ve gorsel paketini ureten Actions run ID
+        type: string
+        required: true
+      artifact_name:
+        description: O run icindeki paket artifact adi
+        type: string
+        required: true
+        default: KAYIP-FREKANS-MPT-INPUT
+      run_video:
+        description: Paket kontrollerinden sonra MPT ile MP4 olustur (varsayilan KAPALI)
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: kf-mpt-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  contract-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test library
+        run: pip install Pillow==11.3.0
+      - name: Secure voice and visual adapter tests
+        run: |
+          python -m unittest discover -s kayip_frekans -p test_mpt_bridge.py -v
+          python -m py_compile kayip_frekans/mpt_bridge.py
+  preview-or-render:
+    if: github.event_name == 'workflow_dispatch'
+    needs: contract-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install local free preflight tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          pip install Pillow==11.3.0
+      - name: Download user-approved production INPUT artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          path: input
+      - name: Require approved full-length narrator and reviewed scene assets
+        run: |
+          python -u kayip_frekans/mpt_bridge.py \
+            --package input \
+            --report output/mpt/preflight.json
+      - name: Fetch the audited MIT-licensed MoneyPrinterTurbo commit
+        if: inputs.run_video == true
+        run: |
+          mkdir -p upstream/MoneyPrinterTurbo
+          git -C upstream/MoneyPrinterTurbo init
+          git -C upstream/MoneyPrinterTurbo remote add origin https://github.com/harry0703/MoneyPrinterTurbo.git
+          git -C upstream/MoneyPrinterTurbo fetch --depth 1 --filter=blob:none origin 633dbb0cf6866e817a023f30c5ac20c6cf3f76de
+          git -C upstream/MoneyPrinterTurbo checkout --detach FETCH_HEAD
+          test "$(git -C upstream/MoneyPrinterTurbo rev-parse HEAD)" = "633dbb0cf6866e817a023f30c5ac20c6cf3f76de"
+          test -f upstream/MoneyPrinterTurbo/LICENSE
+      - uses: astral-sh/setup-uv@v6
+        if: inputs.run_video == true
+      - name: Install upstream free software dependencies
+        if: inputs.run_video == true
+        run: |
+          cd upstream/MoneyPrinterTurbo
+          uv sync --frozen --no-dev
+      - name: Render with ONLY the approved Serkan narration (no auto-TTS)
+        if: inputs.run_video == true
+        run: |
+          cd upstream/MoneyPrinterTurbo
+          uv run --frozen python "$GITHUB_WORKSPACE/kayip_frekans/mpt_bridge.py" \
+            --package "$GITHUB_WORKSPACE/input" \
+            --upstream-dir "$GITHUB_WORKSPACE/upstream/MoneyPrinterTurbo" \
+            --report "$GITHUB_WORKSPACE/output/mpt/preflight.json" \
+            --execute
+      - name: Preserve review-only results - NEVER auto-publish to YouTube
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KAYIP-FREKANS-MPT-REVIEW-${{ github.run_number }}
+          if-no-files-found: warn
+          retention-days: 1
+          compression-level: 0
+          path: |
+            output/mpt/preflight.json
+            upstream/MoneyPrinterTurbo/storage/tasks/**/*.mp4
