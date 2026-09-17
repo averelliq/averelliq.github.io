@@ -1,0 +1,30 @@
+name: KAYIP FREKANS - HIKAYE KURTARMA KONTROLU
+on:
+  push:
+    paths:
+      - .github/workflows/kayip-frekans-recovery-check.yml
+      - kayip_frekans/mpt_story_recovery.py
+      - kayip_frekans/mpt_long_story.py
+      - kayip_frekans/mpt_reference_style.py
+      - kayip_frekans/test_story_recovery.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recovery-tests:
+    name: Syntax and automatic rewrite tests (no video upload)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install minimal story dependencies
+        run: python -m pip install Pillow==11.3.0
+      - name: Compile modified production Python modules
+        run: python -m py_compile kayip_frekans/mpt_story_recovery.py kayip_frekans/mpt_long_story.py kayip_frekans/mpt_reference_style.py
+      - name: Test chapter rewriting and fresh outline recovery
+        env:
+          PYTHONPATH: kayip_frekans
+        run: python -m unittest -v kayip_frekans/test_story_recovery.py
