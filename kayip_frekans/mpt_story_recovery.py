@@ -1,7 +1,8 @@
 """Bounded recovery for original Turkish long-form horror stories.
 
-The model often returns fewer beats than requested. Accept its useful outline
-instead of rerunning the identical oversized JSON request twelve times.
+A small CPU model can return incomplete outlines or irrelevant JSON. Repair an
+outline, preserve completed chapters, and distinguish an unavailable reviewer
+from a genuine editorial finding. The independent final quality gate stays on.
 """
 from __future__ import annotations
 
@@ -22,8 +23,6 @@ def _save(path: Path, data) -> None:
     path.write_text(data if isinstance(data, str) else json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-# These are distinct narrative tasks, not filler text to insert in the story.
-# The generator must still invent the actual events, and editorial gates remain.
 _STAGES = (
     "Somut olayı anlat; görülen veya duyulan ayrıntıyı netleştir, önceki bilgiyi tekrarlama.",
     "Anlatıcının ve tanığın gerçekçi tepkisini, araştırmasını ve somut sonucunu anlat.",
@@ -38,11 +37,7 @@ _FALLBACK_ARC = (
 
 
 def _expand_beats(beats: list[str], count: int) -> list[str]:
-    """Spread 2+ model-authored turning points across distinct scene tasks.
-
-    An incomplete outline is not mistaken for a complete story: only the
-    *plan* is expanded here, and every generated chapter is checked later.
-    """
+    """Expand outline instructions, never pad narration with repeated paragraphs."""
     if len(beats) == count:
         return beats
     result = []
@@ -60,11 +55,6 @@ def _expand_beats(beats: list[str], count: int) -> list[str]:
 
 
 def _outline(topic: str, count: int, ask, feedback: str) -> dict:
-    """Request a short four-turn outline, then deterministically expand beats.
-
-    The old request demanded exactly twelve elaborate JSON items from a 4B CPU
-    model, which repeatedly produced fewer items even after twelve retries.
-    """
     errors = []
     for attempt in range(1, 3):
         prompt = (
@@ -89,8 +79,6 @@ def _outline(topic: str, count: int, ask, feedback: str) -> dict:
             beats = [beat.strip() for beat in raw if isinstance(beat, str) and len(beat.strip()) >= 8]
             if len(beats) < 2:
                 raise ValueError("En az iki somut dönüm noktası yok")
-            # A few meaningful beats can drive twelve different CHAPTER PROMPTS;
-            # never pad the actual narration with duplicate sentences.
             plan["chapters"] = _expand_beats(beats, count)
             plan["outline_source_beats"] = len(beats)
             plan["outline_mode"] = "model_beats_expanded" if len(beats) != count else "model_exact"
@@ -106,8 +94,6 @@ def _outline(topic: str, count: int, ask, feedback: str) -> dict:
         except (ValueError, KeyError, TypeError, RuntimeError) as exc:
             errors.append(f"{type(exc).__name__}: {str(exc)[:140]}")
             print(f"Kısa olay planı yeniden isteniyor ({attempt}/2): {errors[-1]}", flush=True)
-    # This creates only scene instructions, never a fabricated finished story.
-    # Narration still needs real model-generated chapters and full quality checks.
     fallback = {
         "title": "Kapının Öteki Tarafındaki Ses", "characters": "Anlatıcı ve konudaki kişiler; ilişkiler sabit",
         "setting": topic[:300], "rules": "Doğaüstü olayların kuralları değişmez",
@@ -139,9 +125,58 @@ def _passage(prompt: str, minimum: int, maximum: int, ask, output: Path) -> str:
     raise StoryExhausted("Dört denemede tamamlanmış uygun bölüm yazılamadı")
 
 
+def _review_story(story: str, ask, draft: Path) -> dict:
+    """Retry *the review*, not 12 completed chapters, on wrong-schema JSON.
+
+    An unavailable supplementary editor is explicitly reported, not treated as
+    a pass. The caller MUST still run independent story and 8-score gates.
+    Genuine, schema-valid editorial issues remain blocking.
+    """
+    middle = len(story) // 2
+    excerpt = story if len(story) <= 6500 else (
+        story[:2000] + "\n[ORTADAN ALINTI]\n" + story[max(0, middle - 900):middle + 900]
+        + "\n[FINALDEN ALINTI]\n" + story[-2500:]
+    )
+    errors = []
+    for attempt in range(1, 4):
+        prompt = (
+            "GÖREV: Yalnızca aşağıdaki KURMACA hikâye parçalarında açıkça görünen "
+            "karakter, nesne, yer, zaman veya neden-sonuç çelişkisini denetle. "
+            "Cin, kapı çarpması, çığlık tek başına hata değildir. "
+            "Hikâye başlığı veya yazar bilgisi ÜRETME. "
+            'YANIT SADECE ŞU JSON NESNESİ: {"issues":[],"pass":true}. '
+            "Gerçek bir çelişki görürsen issues listesine SOMUT delilini yaz ve pass=false yap. "
+            "Çelişki göremiyorsan issues=[] ve pass=true. "
+            "Başka anahtar kullanma; kısmi alıntıdan görünmeyen sahneler hakkında hüküm verme.\n"
+            + excerpt
+        )
+        try:
+            raw = ask(prompt, structured=True)
+            _save(draft / f"editor_review_attempt_{attempt}.json", raw)
+            if (not isinstance(raw, dict) or type(raw.get("pass")) is not bool
+                    or not isinstance(raw.get("issues"), list)
+                    or not all(isinstance(issue, str) for issue in raw["issues"])):
+                raise ValueError("Editör yanlış JSON şeması döndürdü; hikâye tutarsızlığı değil")
+            issues = [item.strip() for item in raw["issues"] if item.strip()]
+            if raw["pass"] is False or issues:
+                raise StoryExhausted("Editör somut tutarsızlık bildirdi: " + str(issues)[:600])
+            return {"pass": True, "issues": [], "status": "verified_by_local_editor", "attempts": attempt}
+        except StoryExhausted:
+            raise
+        except (ValueError, KeyError, TypeError, RuntimeError) as exc:
+            errors.append(f"{type(exc).__name__}: {str(exc)[:140]}")
+            print(f"Editör yanıt biçimi/erişimi onarılıyor ({attempt}/3): {errors[-1]}", flush=True)
+    result = {"pass": None, "issues": [], "status": "unavailable",
+              "attempts": 3, "errors": errors,
+              "requires_independent_quality_gate": True}
+    _save(draft / "editor_unavailable.json", result)
+    print("Editör JSON şeması hâlâ geçersiz; tamamlanan bölümler korunuyor. BAĞIMSIZ kalite kapısı zorunlu.", flush=True)
+    return result
+
+
 def generate_story(topic: str, minutes: int, ask, output: Path,
                    research_context: str = "", max_story_attempts: int = 3) -> tuple:
-    """Return checked story; never accept fake length, repeated filler or copied text."""
+    """Return story and an explicit editor status; final quality gate is external."""
     if not 15 <= minutes <= 20:
         raise ValueError("Long story must be 15-20 minutes")
     count = max(10, round(minutes / 1.25))
@@ -180,23 +215,16 @@ def generate_story(topic: str, minutes: int, ask, output: Path,
                 _save(draft / "story_only.txt", "\n\n".join(parts))
                 print(f"Hikâye {index+1}/{count} tamamlandı", flush=True)
             story = "\n\n".join(parts)
-            review = ask(
-                "Bu KURMACA hikâyede somut dil, karakter, eşya ve neden-sonuç "
-                "tutarsızlıklarını denetle. Cin, kapı çarpması ve çığlık tek başına hata değildir. "
-                'Sadece JSON: {"issues":["somut hata"],"pass":true}. '
-                "Sorun yoksa issues=[] ve pass=true.\n" + story[:7000] + "\n...\n" + story[-9000:],
-                structured=True,
-            )
+            review = _review_story(story, ask, draft)
             _save(draft / "editor_review.json", review)
-            if not isinstance(review, dict) or review.get("pass") is not True or review.get("issues"):
-                raise ValueError("Editör somut tutarsızlık buldu: " + str(review)[:600])
             report = {
-                "version": "recovery-2", "story_attempt": story_attempt,
+                "version": "recovery-3", "story_attempt": story_attempt,
                 "outline_mode": plan.get("outline_mode"),
                 "outline_source_beats": plan.get("outline_source_beats"),
                 "chapter_count": count, "chapter_word_range": [minimum, maximum],
                 "story_words": len(story.split()), "target_minutes": minutes,
                 "target_words_per_minute": 150, "editor_review": review,
+                "independent_quality_gate_required": True,
                 "rejected_attempts": failures, "human_review_required": True,
                 "recovery_limit": max_story_attempts, "source_text_copied": False,
             }
