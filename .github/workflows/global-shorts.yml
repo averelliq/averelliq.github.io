@@ -18,9 +18,6 @@ on:
           - history
           - everyday
         default: auto
-  push:
-    paths:
-      - ".github/shorts-emergency-now"
   schedule:
     # UTC cron; Türkiye time: 08:15, 16:15, 00:15 (next calendar day).
     # 08:15 science, 16:15 history, 00:15 everyday.
@@ -46,8 +43,6 @@ jobs:
       YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
       YT_DATA_API_KEY: ${{ secrets.YT_DATA_API_KEY }}
-      YT_CHANNEL_ID: UCLvnQcgUZ6Y0lcpilbHuw1g
-      EMERGENCY_NOT_BEFORE: 2026-09-17T09:35:00Z
       YOUTUBE_PRIVACY: public
       GEMINI_MODEL: gemini-3.8-flash
       GEMINI_FALLBACK_MODELS: gemini-3.7-flash,gemini-3.5-flash-lite,gemini-2.5-flash-lite
@@ -97,13 +92,7 @@ jobs:
           PY
 
       - name: Generate, review and upload Short
-        run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "Emergency Gemini-free fallback run"
-            python shorts_bot/emergency_short.py
-          else
-            python shorts_bot/quality_entry.py
-          fi
+        run: python shorts_bot/quality_entry.py
 
       - name: Save generated Short for debugging
         if: always()
