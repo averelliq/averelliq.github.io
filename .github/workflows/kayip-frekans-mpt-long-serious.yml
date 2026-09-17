@@ -1,10 +1,5 @@
 name: KAYIP FREKANS - CIDDI UZUN MPT TESTI
 on:
-  push:
-    paths:
-      - kayip_frekans/mpt_long_story.py
-      - kayip_frekans/mpt_long_test.py
-      - .github/workflows/kayip-frekans-mpt-long-serious.yml
   workflow_dispatch:
     inputs:
       topic:
@@ -34,7 +29,7 @@ env:
 
 jobs:
   story:
-    name: 1 - Uzun cinli hikaye ve kanal girisi
+    name: 1 - Referans tarzinda uzun cinli hikaye ve kalite kapisi
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     env:
@@ -80,7 +75,7 @@ jobs:
           assert text, 'Ollama warm-up returned no content'
           print('Ollama warm-up OK')
           PY
-      - name: Hook ile baslayan 15-20 dk cinli hikayeyi yaz ve girisi hook sonrasina koy
+      - name: Hook-first uzun hikayeyi yaz, internet baglamini kaydet ve kaliteyi puanla
         timeout-minutes: 120
         run: |
           python -u kayip_frekans/mpt_long_story.py \
@@ -98,9 +93,11 @@ jobs:
             output/long-test/story.txt
             output/long-test/narration_script.txt
             output/long-test/story_state.json
+            output/long-test/research_sources.json
+            output/long-test/reference_style_quality.json
 
   prepare:
-    name: 2 - Tok anlatim ve hikayeye uygun gorseller
+    name: 2 - Tok anlatim ve hareketli sinematik B-roll
     needs: story
     runs-on: ubuntu-24.04
     timeout-minutes: 300
@@ -132,10 +129,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0 torchaudio==2.6.0
           pip install chatterbox-tts==0.1.7 soundfile Pillow==11.3.0
-      - name: Tok sesle tam anlatim adayini ve sahne gorsellerini uret
+      - name: Tok sesle tam anlatim adayini ve hareketli B-roll sahnelerini uret
         timeout-minutes: 270
         run: |
-          python -u kayip_frekans/mpt_long_test.py \
+          python -u kayip_frekans/mpt_long_reference_test.py \
             --stage prepare \
             --workspace "$GITHUB_WORKSPACE" \
             --approved-audio "$GITHUB_WORKSPACE/input/audio/serkan-v6-2-tok.wav" \
@@ -152,6 +149,8 @@ jobs:
             output/long-test/story.txt
             output/long-test/narration_script.txt
             output/long-test/story_state.json
+            output/long-test/research_sources.json
+            output/long-test/reference_style_quality.json
             output/long-test/narration.wav
             output/long-test/captions.srt
             output/long-test/tts_report.json
@@ -159,10 +158,10 @@ jobs:
             output/long-test/scene_assets.json
             output/long-test/visual_credits.json
             output/long-test/visual_credits.txt
-            output/long-test/scenes/*.jpg
+            output/long-test/scenes/*
 
   render:
-    name: 3 - MoneyPrinterTurbo uzun video montaji
+    name: 3 - MoneyPrinterTurbo sinematik uzun video montaji
     needs: prepare
     runs-on: ubuntu-24.04
     timeout-minutes: 150
@@ -195,11 +194,11 @@ jobs:
         run: |
           cd upstream/MoneyPrinterTurbo
           uv sync --frozen --no-dev
-      - name: Gercek uzun MP4 montajini yap - tok ses, altyazi, atmosfer
+      - name: Gercek uzun MP4 montajini yap - tok ses, B-roll, fade, altyazi, atmosfer
         timeout-minutes: 100
         run: |
           cd upstream/MoneyPrinterTurbo
-          uv run --frozen python "$GITHUB_WORKSPACE/kayip_frekans/mpt_long_test.py" \
+          uv run --frozen python "$GITHUB_WORKSPACE/kayip_frekans/mpt_long_reference_test.py" \
             --stage render \
             --workspace "$GITHUB_WORKSPACE" \
             --upstream "$GITHUB_WORKSPACE/upstream/MoneyPrinterTurbo" \
@@ -219,6 +218,8 @@ jobs:
             output/long-test/narration_script.txt
             output/long-test/captions.srt
             output/long-test/story_state.json
+            output/long-test/research_sources.json
+            output/long-test/reference_style_quality.json
             output/long-test/tts_report.json
             output/long-test/prepare_report.json
             output/long-test/final_report.json
