@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - .github/workflows/kayip-frekans-v6-voice-audition.yml
+      - kayip_frekans/voice_preview_v6.py
 permissions:
   contents: read
 concurrency:
@@ -15,8 +16,8 @@ jobs:
     timeout-minutes: 95
     env:
       # Optional PRIVATE secret: base64 of the ORIGINAL complete 44.5s MP3.
-      # Without it the existing repository's ~10s excerpt is used and the
-      # report explicitly says this cannot certify the full reference.
+      # Without it the repository's ~10s excerpt is used and the report
+      # clearly says the full original reference was unavailable.
       KF_FULL_REFERENCE_B64: ${{ secrets.KF_FULL_REFERENCE_B64 }}
       HF_HUB_DISABLE_TELEMETRY: '1'
     steps:
