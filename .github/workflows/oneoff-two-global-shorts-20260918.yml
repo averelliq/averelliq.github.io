@@ -1,0 +1,166 @@
+name: One-off Two Global Shorts 2026-09-18
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/oneoff-two-global-shorts-20260918.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: global-shorts-bot
+  cancel-in-progress: false
+
+jobs:
+  publish-two-distinct:
+    if: github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+      YT_DATA_API_KEY: ${{ secrets.YT_DATA_API_KEY }}
+      YOUTUBE_PRIVACY: public
+      GEMINI_MODEL: gemini-2.5-flash
+      GEMINI_FALLBACK_MODELS: gemini-3.5-flash-lite,gemini-2.5-flash-lite
+      TTS_VOICE: am_michael
+      SHORTS_AI_REVIEW: '1'
+      SHORTS_TREND_MODE: 'off'
+      SHORTS_SKIP_UPLOAD: '0'
+      SHORTS_MAX_VISUAL_CANDIDATES: '9'
+      PYTHONUNBUFFERED: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: shorts_bot/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: kokoro-${{ runner.os }}-v1
+      - name: Install video and voice dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg espeak-ng libsndfile1
+          pip install -r shorts_bot/requirements.txt
+          pip check
+          python -m compileall -q shorts_bot
+      - name: Verify HTTP 404 selects the next model, not the same failed model
+        run: |
+          PYTHONPATH=shorts_bot python - <<'PY'
+          import os
+          import retry_runner
+          class FakeResponse:
+              def __init__(self, code):
+                  self.status_code = code
+                  self.ok = 200 <= code < 300
+          seen = []
+          original = retry_runner._ORIGINAL_POST
+          def fake_post(url, *args, **kwargs):
+              seen.append(url)
+              return FakeResponse(404 if len(seen) == 1 else 200)
+          try:
+              retry_runner._ORIGINAL_POST = fake_post
+              os.environ['GEMINI_FALLBACK_MODELS'] = 'gemini-2.5-flash'
+              result = retry_runner.resilient_post('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent')
+              assert result.status_code == 200 and len(seen) == 2
+              assert 'gemini-2.5-flash-lite:' in seen[0] and 'gemini-2.5-flash:' in seen[1]
+              print('PASS: HTTP 404 uses a different fallback model exactly once')
+          finally:
+              retry_runner._ORIGINAL_POST = original
+          PY
+      - name: Select a Gemini model available to this API key
+        run: |
+          python - <<'PY'
+          import os, requests
+          key = os.environ.get('GEMINI_API_KEY', '')
+          if not key:
+              raise RuntimeError('Gemini API key missing; no videos will be uploaded')
+          names = set()
+          token = ''
+          for _ in range(5):
+              response = requests.get('https://generativelanguage.googleapis.com/v1beta/models', headers={'x-goog-api-key': key}, params={'pageSize': 100, **({'pageToken': token} if token else {})}, timeout=35)
+              print('Gemini model discovery HTTP', response.status_code, flush=True)
+              response.raise_for_status()
+              data = response.json()
+              for model in data.get('models', []):
+                  if 'generateContent' in model.get('supportedGenerationMethods', []):
+                      names.add(model.get('name', '').removeprefix('models/'))
+              token = data.get('nextPageToken', '')
+              if not token:
+                  break
+          for model in ('gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.5-flash-lite'):
+              if model in names:
+                  with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env:
+                      env.write('GEMINI_MODEL=' + model + '\n')
+                      env.write('GEMINI_FALLBACK_MODELS=' + ','.join(x for x in ('gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.5-flash-lite') if x in names and x != model) + '\n')
+                  print('Selected supported Gemini model:', model, flush=True)
+                  break
+          else:
+              raise RuntimeError('No configured Gemini text+vision model available to this key; uploading cancelled')
+          PY
+      - name: Create, review, render and publicly upload first Short
+        env:
+          SHORTS_THEME: everyday
+        run: |
+          test "$SHORTS_SKIP_UPLOAD" = 0
+          test "$YOUTUBE_PRIVACY" = public
+          python shorts_bot/quality_entry.py
+          cp shorts_bot/output/short.mp4 shorts_bot/output/first_short.mp4
+          cp shorts_bot/output/plan.json shorts_bot/output/first_plan.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          plan=json.loads(Path('shorts_bot/output/first_plan.json').read_text())
+          assert plan['theme']=='everyday'
+          assert Path('shorts_bot/output/first_short.mp4').stat().st_size>100000
+          print('FIRST SHORT COMPLETE:',plan['title'],'TOPIC:',plan['topic'],flush=True)
+          PY
+      - name: Create and publish second Short only if truly distinct
+        env:
+          SHORTS_THEME: science
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, sys
+          from pathlib import Path
+          sys.path.insert(0,str(Path('shorts_bot').resolve()))
+          import quality_entry
+          import main
+          original_upload = main.upload_youtube
+          first = json.loads(Path('shorts_bot/output/first_plan.json').read_text(encoding='utf-8'))
+          first_hash = hashlib.sha256(Path('shorts_bot/output/first_short.mp4').read_bytes()).hexdigest()
+          def distinct_upload(video, plan):
+              if plan.get('theme') != 'science' or plan.get('title') == first.get('title') or plan.get('topic') == first.get('topic'):
+                  raise RuntimeError('Second Short repeats the first topic/title; upload blocked')
+              if hashlib.sha256(Path(video).read_bytes()).hexdigest() == first_hash:
+                  raise RuntimeError('Second Short is a duplicate MP4; upload blocked')
+              if os.getenv('YOUTUBE_PRIVACY') != 'public' or os.getenv('SHORTS_SKIP_UPLOAD') == '1':
+                  raise RuntimeError('Public upload was not enabled')
+              return original_upload(video, plan)
+          main.upload_youtube = distinct_upload
+          quality_entry.upgrade.main()
+          PY
+          cp shorts_bot/output/short.mp4 shorts_bot/output/second_short.mp4
+          cp shorts_bot/output/plan.json shorts_bot/output/second_plan.json
+          echo 'TWO DISTINCT SHORTS: BOTH UPLOAD STEPS COMPLETED'
+      - name: Preserve first and second Shorts and plans
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: two-shorts-20260918-${{ github.run_id }}
+          path: |
+            shorts_bot/output/first_short.mp4
+            shorts_bot/output/first_plan.json
+            shorts_bot/output/second_short.mp4
+            shorts_bot/output/second_plan.json
+            shorts_bot/output/visual_sources.json
+          if-no-files-found: ignore
+          retention-days: 5
