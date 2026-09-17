@@ -22,40 +22,47 @@ import mpt_reference_style
 
 
 def stable_ask(prompt: str, structured: bool = False):
-    """Ollama chat with deterministic resource limits and transient retries."""
-    payload = {
-        "model": os.getenv("KF_STORY_MODEL", "gemma3:4b"),
-        "stream": False,
-        "keep_alive": "30m",
-        "messages": [
-            {"role": "system", "content": cloud_v3.SYSTEM},
-            {"role": "user", "content": prompt},
-        ],
-        "options": {
-            "num_ctx": 4096,
-            "num_predict": 1600,
-            "num_thread": 2,
-            "temperature": 0.68,
-            "repeat_penalty": 1.15,
-        },
-    }
-    if structured:
-        payload["format"] = "json"
-    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    """Ollama chat with bounded resources and retries for transient failures.
+
+    Long Turkish chapters repeatedly hit the former 1600-token output limit.
+    Give the model an adequate generation budget without silently accepting
+    incomplete chapters or malformed JSON.
+    """
     last_error = None
     for attempt, delay in enumerate((0, 8, 18, 30), start=1):
         if delay:
             time.sleep(delay)
+        token_budget = 3200 if attempt <= 2 else 4000
+        payload = {
+            "model": os.getenv("KF_STORY_MODEL", "gemma3:4b"),
+            "stream": False,
+            "keep_alive": "30m",
+            "messages": [
+                {"role": "system", "content": cloud_v3.SYSTEM},
+                {"role": "user", "content": prompt},
+            ],
+            "options": {
+                "num_ctx": 6144,
+                "num_predict": token_budget,
+                "num_thread": 2,
+                "temperature": 0.68,
+                "repeat_penalty": 1.15,
+            },
+        }
+        if structured:
+            payload["format"] = "json"
+        raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(
             "http://127.0.0.1:11434/api/chat",
             data=raw,
             headers={"Content-Type": "application/json"},
         )
         try:
-            print(f"Model yaniti bekleniyor ({attempt}/4).", flush=True)
+            print(f"Model yaniti bekleniyor ({attempt}/4; token budget={token_budget}).", flush=True)
             with urllib.request.urlopen(request, timeout=600) as response:
                 result = json.load(response)
             if result.get("done_reason") == "length":
+                print(f"Ollama output truncated at {token_budget} tokens; incomplete answer rejected.", flush=True)
                 raise ValueError("Metin token sinirinda kesildi")
             text = str(result["message"]["content"]).strip()
             if not text:
@@ -65,13 +72,13 @@ def stable_ask(prompt: str, structured: bool = False):
                 json.JSONDecodeError, KeyError, ValueError) as exc:
             last_error = exc
             status = getattr(exc, "code", None)
-            print(f"Ollama gecici hata (deneme {attempt}/4, HTTP={status}): {type(exc).__name__}", flush=True)
+            print(f"Ollama hata (deneme {attempt}/4, HTTP={status}): {type(exc).__name__}: {str(exc)[:160]}", flush=True)
             try:
                 with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=20) as response:
                     response.read(256)
             except Exception:
                 pass
-    raise RuntimeError(f"Ollama four attempts failed: {type(last_error).__name__}") from last_error
+    raise RuntimeError(f"Ollama four attempts failed: {type(last_error).__name__}: {str(last_error)[:160]}") from last_error
 
 
 def compose(topic: str, minutes: int, output: Path) -> dict:
