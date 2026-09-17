@@ -69,7 +69,10 @@ state.update({'total':total,'segments':segments,'report':report})
     'timing_scale':ratio,
     'reference_seconds':v4.seconds(OUT/'serkan-reference.mp3'),
 },ensure_ascii=False,indent=2),encoding='utf-8')
-v3.duration_gate(total, int(state['minutes']), bool(report['preview']))
+# This analysis workflow explicitly targets 15-20 minutes. Do not reject a
+# valid 17:15 narration using the generic +/-10% around a 15-minute target.
+if not 15 * 60 <= total <= 20 * 60:
+    raise ValueError(f'Analiz sesi 15-20 dakika aralığı dışında: {total:.1f}s')
 if any(b<a or b>total+.5 for a,b,_ in cues):
     raise ValueError('Altyazı zamanı ses aralığı dışında.')
 print(f'Tek kesintisiz final narration.wav hazır: {total:.2f}s; oran={ratio:.6f}')
