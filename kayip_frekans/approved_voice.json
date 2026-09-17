@@ -1,0 +1,17 @@
+{
+  "voice_id": "serkan-v6-2-tok",
+  "voice_label": "Serkan Demirci - tok (user-approved audition)",
+  "approved_by_user": true,
+  "approved_variant": "tok",
+  "approval_scope": "22.84-second audition voice character; not approval of any future full-length generated narration",
+  "source_workflow_run_id": 35222626464,
+  "source_artifact_name": "KAYIP-FREKANS-V6-REFERANS-SES-TESTI",
+  "source_audio_filename": "serkan-v6-2-tok.wav",
+  "source_audio_sha256": "586244cd639faf5fd5995d1f4a9e74c4bceb7a88852075eee8d046274ea9528b",
+  "voice_engine": "ChatterboxMultilingualTTS direct reference",
+  "reference_seconds_used_for_audition": 10.056,
+  "fallback_tts_allowed": false,
+  "legacy_ahmet_openvoice_allowed": false,
+  "long_video_requires_separate_audio_and_visual_approval": true,
+  "youtube_autopublish_allowed": false
+}
