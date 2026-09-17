@@ -2,16 +2,79 @@
 
 The story itself starts with a concrete hook. The short channel intro is inserted
 AFTER the hook so the first seconds are not spent on a generic greeting.
+
+GitHub's free CPU runner can occasionally return an Ollama HTTP 500 while a model
+is first loading. Story generation therefore uses bounded retries and a smaller
+context/thread setting instead of silently switching to another content source.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+import time
+import urllib.error
+import urllib.request
 
 import bot
 import cloud_v3
 import mpt_profile
+
+
+def stable_ask(prompt: str, structured: bool = False):
+    """Ollama chat with deterministic resource limits and transient retries."""
+    payload = {
+        "model": os.getenv("KF_STORY_MODEL", "gemma3:4b"),
+        "stream": False,
+        "keep_alive": "30m",
+        "messages": [
+            {"role": "system", "content": cloud_v3.SYSTEM},
+            {"role": "user", "content": prompt},
+        ],
+        "options": {
+            "num_ctx": 4096,
+            "num_predict": 1600,
+            "num_thread": 2,
+            "temperature": 0.72,
+            "repeat_penalty": 1.12,
+        },
+    }
+    if structured:
+        payload["format"] = "json"
+    raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    last_error = None
+    for attempt, delay in enumerate((0, 8, 18, 30), start=1):
+        if delay:
+            time.sleep(delay)
+        request = urllib.request.Request(
+            "http://127.0.0.1:11434/api/chat",
+            data=raw,
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            print(f"Model yaniti bekleniyor ({attempt}/4).", flush=True)
+            with urllib.request.urlopen(request, timeout=600) as response:
+                result = json.load(response)
+            if result.get("done_reason") == "length":
+                raise ValueError("Metin token sinirinda kesildi")
+            text = str(result["message"]["content"]).strip()
+            if not text:
+                raise ValueError("Model bos yanit verdi")
+            return json.loads(text) if structured else text
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError,
+                json.JSONDecodeError, KeyError, ValueError) as exc:
+            last_error = exc
+            status = getattr(exc, "code", None)
+            print(f"Ollama gecici hata (deneme {attempt}/4, HTTP={status}): {type(exc).__name__}", flush=True)
+            # Verify the service is still reachable before the next try. The
+            # response body is intentionally discarded; nothing private is logged.
+            try:
+                with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=20) as response:
+                    response.read(256)
+            except Exception:
+                pass
+    raise RuntimeError(f"Ollama four attempts failed: {type(last_error).__name__}") from last_error
 
 
 def compose(topic: str, minutes: int, output: Path) -> dict:
@@ -19,6 +82,9 @@ def compose(topic: str, minutes: int, output: Path) -> dict:
         raise ValueError("Serious long test target must be 15-20 minutes")
     output.mkdir(parents=True, exist_ok=True)
 
+    # Reuse the proven KAYIP FREKANS story planner/editor, but replace only its
+    # fragile model transport. All story rules remain the same.
+    cloud_v3.ask = stable_ask
     title, parts, report = cloud_v3.create_story(topic, minutes, preview=False)
     if len(parts) < 2:
         raise ValueError("Long story did not contain story chapters")
