@@ -1,4 +1,4 @@
-"""Fast offline tests; no Ollama, Pexels, TTS or video upload required."""
+"""Offline tests for KAYIP FREKANS story recovery, without Ollama or video."""
 from pathlib import Path
 import tempfile
 import unittest
@@ -27,13 +27,12 @@ class RecoveryTests(unittest.TestCase):
         self.assertIn("final", plan["chapters"][-1].lower())
 
     def test_empty_outline_uses_story_scaffold_not_fake_narration(self):
-        with patch.object(mpt_story_recovery.time, "sleep", return_value=None):
-            plan = mpt_story_recovery._outline(
-                "Ölen kardeşimin sesi kilitli kapıdan geldi", 12,
-                lambda prompt, structured=False: {"chapters": []}, "")
+        plan = mpt_story_recovery._outline(
+            "Ölen kardeşimin sesi kilitli kapıdan geldi", 12,
+            lambda prompt, structured=False: {"chapters": []}, "")
         self.assertEqual(plan["outline_mode"], "topic_grounded_scaffold")
         self.assertEqual(len(plan["chapters"]), 12)
-        self.assertIn("ipucu", plan["chapters"][-1].lower())
+        self.assertIn("final", plan["chapters"][-1].lower())
 
     def test_bad_chapter_is_rewritten_not_silently_accepted(self):
         responses = iter(["bozuk metin", "Gece köydeki kapı içeriden çarptı ve kardeşimin sesini duydum."])
@@ -42,26 +41,21 @@ class RecoveryTests(unittest.TestCase):
                 ValueError("ilk taslak hatalı"),
                 "Gece köydeki kapı içeriden çarptı ve kardeşimin sesini duydum.",
             ]):
-                result = mpt_story_recovery._passage(
-                    "Köy evi", 5, 100, lambda prompt: next(responses), Path(folder)
-                )
+                result = mpt_story_recovery._passage("Köy evi", 5, 100, lambda p: next(responses), Path(folder))
             self.assertIn("kapı", result)
             self.assertTrue((Path(folder) / "accepted.txt").is_file())
             self.assertTrue((Path(folder) / "last_failure.txt").is_file())
 
     def test_four_failed_chapter_attempts_trigger_new_outline(self):
-        count = 0
-        outlines = 0
+        count, outlines = 0, 0
         def fake_ask(prompt, structured=False):
             nonlocal count, outlines
             if "Tam JSON şeması" in prompt:
                 outlines += 1
-                return {
-                    "title": "Köydeki Ses", "characters": "Ali ve ölen kardeşi",
-                    "setting": "Bir köy evi", "rules": "Ses kapalı kapıdan gelir",
-                    "clues": "Saat ve eski fotoğraf",
-                    "chapters": [f"Olaylar tutarlı gelişiyor; bölüm {i}" for i in range(12)],
-                }
+                return {"title": "Köydeki Ses", "characters": "Ali ve ölen kardeşi",
+                        "setting": "Bir köy evi", "rules": "Ses kapalı kapıdan gelir",
+                        "clues": "Saat ve eski fotoğraf",
+                        "chapters": [f"Olaylar tutarlı gelişiyor; bölüm {i}" for i in range(12)]}
             if structured and '"issues"' in prompt:
                 return {"issues": [], "pass": True}
             count += 1
@@ -72,8 +66,7 @@ class RecoveryTests(unittest.TestCase):
             with patch.object(mpt_story_recovery.cloud_v3, "check_passage", side_effect=lambda text, a, b: text), \
                  patch.object(mpt_story_recovery.time, "sleep", return_value=None):
                 title, parts, report = mpt_story_recovery.generate_story(
-                    "Köy evi", 15, fake_ask, Path(folder), max_story_attempts=2
-                )
+                    "Köy evi", 15, fake_ask, Path(folder), max_story_attempts=2)
             self.assertEqual(outlines, 2)
             self.assertEqual(count, 16)
             self.assertEqual(len(parts), 13)
