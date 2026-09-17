@@ -69,7 +69,7 @@ async def tts_single_stream(text: str, path: Path):
 def whole_file_voice_conversion(source_wav: Path, target_ref: Path, output_wav: Path):
     """Kaynak sesin TAMAMINI tek OpenVoice conversion cagrisi ile donusturur."""
     import openvoice_cli
-    from openvoice_cli.api import ToneColorConverter
+    from openvoice_cli.api import ToneColorConverter, OpenVoiceBaseClass
     from openvoice_cli.downloader import download_checkpoint
 
     pkg = Path(openvoice_cli.__file__).resolve().parent
@@ -80,11 +80,13 @@ def whole_file_voice_conversion(source_wav: Path, target_ref: Path, output_wav: 
     if not config.exists() or not checkpoint.exists():
         download_checkpoint(str(checkpoint_dir))
 
-    converter = ToneColorConverter(
-        str(config),
-        device="cpu",
-        enable_watermark=False,
-    )
+    # openvoice-cli 0.0.5'te ToneColorConverter.__init__, enable_watermark
+    # parametresini yanlislikla base constructor'a iletiyor. Hata veren wrapper'i
+    # atlayip ayni sinifi dogrudan base initializer ile kuruyoruz.
+    converter = ToneColorConverter.__new__(ToneColorConverter)
+    OpenVoiceBaseClass.__init__(converter, str(config), device="cpu")
+    converter.watermark_model = None
+    converter.version = getattr(converter.hps, "_version_", "v1")
     converter.load_ckpt(str(checkpoint))
 
     # Speaker embedding icin kisa temiz ornek yeterlidir. Asil anlatim
