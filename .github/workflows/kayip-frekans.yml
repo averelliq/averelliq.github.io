@@ -1,4 +1,4 @@
-name: KAYIP FREKANS - Ucretsiz Video Botu
+name: KAYIP FREKANS - V13 Serkan Anlatici
 on:
   workflow_dispatch:
     inputs:
@@ -11,8 +11,8 @@ on:
         default: '30'
         type: string
       test:
-        description: Sadece kısa üretim testi
-        default: false
+        description: Sadece kısa AI hikayesi ve test videosu
+        default: true
         type: boolean
   push:
     paths:
@@ -41,18 +41,19 @@ jobs:
       - name: Turkce giris ve kalite testleri
         run: python -m unittest discover -s kayip_frekans -p 'test_*.py' -v
       - name: Python sozdizimi
-        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/cloud_v4.py kayip_frekans/cloud_v5.py kayip_frekans/cloud_v6.py kayip_frekans/cloud_v7.py kayip_frekans/cloud_v8.py kayip_frekans/cloud_v9.py kayip_frekans/cloud_v10.py kayip_frekans/cloud_v11.py kayip_frekans/cloud_v12.py kayip_frekans/quality.py
+        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/cloud_v4.py kayip_frekans/cloud_v5.py kayip_frekans/cloud_v6.py kayip_frekans/cloud_v7.py kayip_frekans/cloud_v8.py kayip_frekans/cloud_v9.py kayip_frekans/cloud_v10.py kayip_frekans/cloud_v11.py kayip_frekans/cloud_v12.py kayip_frekans/cloud_v13.py kayip_frekans/serkan_voice.py kayip_frekans/brand_logo.py kayip_frekans/quality.py
   video:
-    if: github.event.repository.private == false && github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' && github.event.repository.private == false
     needs: quality
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
       STORY_TOPIC: ${{ inputs.topic }}
       TARGET_MINUTES: ${{ inputs.minutes || '30' }}
-      SHORT_TEST: ${{ github.event_name != 'workflow_dispatch' || inputs.test }}
-      FAST_VISUAL_SMOKE: ${{ github.event_name == 'push' && '1' || '0' }}
+      SHORT_TEST: ${{ inputs.test }}
+      FAST_VISUAL_SMOKE: '0'
       DOCUMENTARY_SHOT_SECONDS: '20'
       OLLAMA_HOST: 127.0.0.1:11434
     steps:
@@ -60,48 +61,51 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Ucretsiz araclari GitHub sunucusuna kur
+      - name: Require selected Serkan voice credentials; do not fall back
+        run: |
+          if [ -z "$ELEVENLABS_API_KEY" ]; then
+            echo 'ELEVENLABS_API_KEY GitHub Actions Secret eksik. Serkan disinda ses kullanilmadi.' >&2
+            exit 1
+          fi
+      - name: Video araclarini GitHub sunucusuna kur
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg fonts-dejavu-core
           pip install -r kayip_frekans/requirements.txt
-          if [ "$FAST_VISUAL_SMOKE" != "1" ]; then
-            curl --fail --location --retry 3 https://ollama.com/install.sh -o /tmp/install-ollama.sh
-            sh /tmp/install-ollama.sh
-            ollama serve >/tmp/ollama.log 2>&1 &
-            for attempt in $(seq 1 30); do
-              if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
-              sleep 2
-            done
-            ollama pull gemma3:4b
-          else
-            echo 'FAST_VISUAL_SMOKE=1: Ollama kurulumu ve model indirme atlandı.'
-          fi
-      - name: Belgesel slow-burn hikaye yaz ve editor kontrolunden gecir
-        timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.test != true && 120 || 15 }}
+          curl --fail --location --retry 3 https://ollama.com/install.sh -o /tmp/install-ollama.sh
+          sh /tmp/install-ollama.sh
+          ollama serve >/tmp/ollama.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
+            sleep 2
+          done
+          ollama pull gemma3:4b
+      - name: Hikaye yaz ve editor kontrolunden gecir
+        timeout-minutes: ${{ inputs.test != true && 120 || 15 }}
         run: |
           if [ "$SHORT_TEST" = "true" ]; then
-            python -u kayip_frekans/cloud_v12.py --stage story --smoke
+            python -u kayip_frekans/cloud_v13.py --stage story --smoke
           else
-            python -u kayip_frekans/cloud_v12.py --stage story
+            python -u kayip_frekans/cloud_v13.py --stage story
           fi
-      - name: Turkce ses ve kompakt altyazi
+      - name: Sadece Serkan Demirci sesi ve dogru zamanli altyazi
         timeout-minutes: 30
-        run: python -u kayip_frekans/cloud_v12.py --stage narration
-      - name: Sikilastirilmis baglam filtreli 1080p B-roll montaji
+        run: python -u kayip_frekans/cloud_v13.py --stage narration
+      - name: Orijinal logolu giris ve 1080p belgesel montaji
         timeout-minutes: 75
-        run: python -u kayip_frekans/cloud_v12.py --stage render
+        run: python -u kayip_frekans/cloud_v13.py --stage render
       - name: Hazir videoyu indirilebilir yap
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: KAYIP-FREKANS-${{ github.run_number }}
-          retention-days: 1
+          retention-days: 7
           compression-level: 0
           if-no-files-found: warn
           path: |
             output/final.mp4
             output/thumbnail.jpg
+            output/intro-card.jpg
             output/story.txt
             output/story_only.txt
             output/intro.txt
@@ -110,6 +114,7 @@ jobs:
             output/metadata.json
             output/validation.json
             output/quality_report.json
+            output/voice_report.json
             output/scene_plan.json
             output/shots.json
             output/visual_sources.json
