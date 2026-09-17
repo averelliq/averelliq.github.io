@@ -1,0 +1,32 @@
+name: KAYIP FREKANS - CANLI KAMU MALI HIKAYE ERISIM TESTI
+on:
+  push:
+    paths:
+      - .github/workflows/kayip-frekans-web-source-smoke.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  web-source-smoke:
+    name: Verify live Wikisource full story and attribution (no model or video)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Retrieve real public-domain source without touching video pipeline
+        env:
+          PYTHONPATH: kayip_frekans
+        run: |
+          python -u - <<'PY'
+          import mpt_web_story
+          source = mpt_web_story.fetch_story('Köy evi, ölen kardeşimin sesi, eski kapı')
+          if not source:
+              raise RuntimeError('Live public-domain story provider unavailable; original fiction fallback still works')
+          assert source['source_words'] > 350
+          assert source['author'] == 'Edgar Allan Poe'
+          assert source['url'].startswith('https://en.wikisource.org/wiki/')
+          print('LIVE SOURCE VERIFIED:', source['title'], source['source_words'], source['url'])
+          PY
