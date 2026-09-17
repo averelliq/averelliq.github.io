@@ -18,6 +18,9 @@ on:
           - history
           - everyday
         default: auto
+  push:
+    paths:
+      - ".github/shorts-run-now"
   schedule:
     # UTC cron; Türkiye time: 08:15, 16:15, 00:15 (next calendar day).
     # 08:15 science, 16:15 history, 00:15 everyday.
@@ -44,7 +47,8 @@ jobs:
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
       YT_DATA_API_KEY: ${{ secrets.YT_DATA_API_KEY }}
       YOUTUBE_PRIVACY: public
-      GEMINI_MODEL: gemini-3.6-flash
+      GEMINI_MODEL: gemini-3.8-flash
+      GEMINI_FALLBACK_MODELS: gemini-3.7-flash,gemini-3.5-flash-lite,gemini-2.5-flash-lite
       TTS_VOICE: am_michael
       SHORTS_THEME: ${{ inputs.theme || 'auto' }}
       SHORTS_AI_REVIEW: '1'
@@ -90,7 +94,7 @@ jobs:
           print('Python imports OK')
           PY
 
-      - name: Generate and visually review Short (upload disabled in smoke test)
+      - name: Generate, review and upload Short
         run: python shorts_bot/quality_entry.py
 
       - name: Save generated Short for debugging
