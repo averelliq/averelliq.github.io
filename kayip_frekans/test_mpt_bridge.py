@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import wave
 
 from PIL import Image
@@ -51,7 +52,8 @@ class MptBridgeTests(unittest.TestCase):
         (self.root / 'scenes.json').write_text(json.dumps(self.scenes), encoding='utf-8')
 
     def ready(self):
-        return bridge.prepare(self.root, min_seconds=20, max_seconds=40)
+        with patch.object(bridge, 'probe', return_value={'seconds': 30.0}):
+            return bridge.prepare(self.root, min_seconds=20, max_seconds=40)
 
     def test_preflight_accepts_exact_approved_audio_and_three_scenes(self):
         plan = self.ready()
@@ -108,8 +110,9 @@ class MptBridgeTests(unittest.TestCase):
             self.ready()
 
     def test_no_approved_long_audio_cannot_run_as_15min(self):
-        with self.assertRaisesRegex(ValueError, 'outside'):
-            bridge.prepare(self.root)
+        with patch.object(bridge, 'probe', return_value={'seconds': 30.0}):
+            with self.assertRaisesRegex(ValueError, 'outside'):
+                bridge.prepare(self.root)
 
     def test_long_scene_rejected(self):
         self.scenes[0]['end'] = 26
