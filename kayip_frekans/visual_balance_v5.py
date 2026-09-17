@@ -13,7 +13,7 @@ from collections import Counter
 from pathlib import Path
 
 CUES = {
-    'room': ('dolap', 'yatak', 'mutfak', 'masa', 'telefon', 'sandık', 'odam', 'odanın', 'oda '),
+    'room': ('dolap', 'dolab', 'yatak', 'mutfak', 'masa', 'telefon', 'sandık', 'odam', 'odanın', 'oda '),
     'window': ('pencere', 'perde', 'camdan', 'camın', 'dışarı baktım'),
     'house': ('bahçe', 'avlu', 'evin önü', 'köy yolu', 'çamur', 'dışarıda'),
     'corridor': ('koridor', 'holün', 'holde', 'duvar', 'fısıltı', 'adım sesi'),
@@ -26,7 +26,6 @@ CUES = {
 
 def evidence(text):
     text = text.casefold()
-    # A final concrete event is usually the most relevant image for a passage.
     last = re.split(r'[.!?…]\s+', text)[-2:]
     focus = ' '.join(last)[-350:]
     scores = {}
@@ -45,11 +44,9 @@ def balance(segments):
     for segment in segments:
         scores = evidence(str(segment.get('text', '')))
         if not scores:
-            # Ambiguous internal scene: plain empty room, never random forest/candle.
             scores = {'room': 1, 'corridor': 1}
         n = len(previous)
         def rank(kind):
-            # Repetition penalties matter only when the text supports alternatives.
             consecutive = (previous[-1] == kind) if previous else False
             repeated = len(previous) >= 2 and previous[-2:] == [kind, kind]
             ratio = counts[kind] / max(1, n)
@@ -77,8 +74,6 @@ def validate(segments):
         if float(scene.get('end', 0)) <= float(scene.get('start', 0)):
             raise ValueError(f'Scene {i}: invalid duration')
         counts[kind] += 1
-    # If narration contains only one evidenced setting, do NOT hallucinate
-    # additional ones just to satisfy a diversity quota. Surface the issue.
     return {'scene_count': len(segments), 'categories': dict(counts),
             'dominant_share': round(max(counts.values()) / len(segments), 3),
             'visual_repetition_warning': max(counts.values()) / len(segments) > .45}
