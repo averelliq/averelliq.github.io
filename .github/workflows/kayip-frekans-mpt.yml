@@ -1,31 +1,44 @@
-name: KAYIP FREKANS - MoneyPrinterTurbo Deneme
+name: KAYIP FREKANS - ANA BOT (MoneyPrinterTurbo)
 on:
   push:
     paths:
       - kayip_frekans/mpt_bridge.py
+      - kayip_frekans/mpt_profile.py
       - kayip_frekans/test_mpt_bridge.py
+      - kayip_frekans/test_mpt_profile.py
       - .github/workflows/kayip-frekans-mpt.yml
   workflow_dispatch:
     inputs:
-      source_run_id:
-        description: Onayli hikaye, tam anlatim ve gorsel paketini ureten Actions run ID
-        type: string
-        required: true
-      artifact_name:
-        description: O run icindeki paket artifact adi
-        type: string
-        required: true
-        default: KAYIP-FREKANS-MPT-INPUT
       mode:
-        description: Kisa teknik deneme veya 15-20 dakika
+        description: Hikaye yazim talimati (brief), kisa onizleme (preview) veya tam video (full)
         type: choice
         required: true
-        default: preview
+        default: brief
         options:
+          - brief
           - preview
           - full
+      topic:
+        description: Yeni korku hikayesi konusu (brief modunda)
+        type: string
+        required: false
+        default: Köy evindeki kilitli kapının ardından kardeşimin sesini duydum
+      target_minutes:
+        description: Hedef hikaye dakikasi; tam video icin 15-20
+        type: number
+        required: true
+        default: 20
+      source_run_id:
+        description: Preview/full icin onaylanmis ses, hikaye ve gorsel paketinin Actions run ID'si
+        type: string
+        required: false
+      artifact_name:
+        description: Onayli input paketinin artifact adi
+        type: string
+        required: false
+        default: KAYIP-FREKANS-MPT-INPUT
       run_video:
-        description: Paket kontrollerinden sonra MPT ile MP4 olustur (varsayilan KAPALI)
+        description: Kontrollerden sonra MoneyPrinterTurbo ile video montajini calistir (varsayilan KAPALI)
         type: boolean
         required: true
         default: false
@@ -33,7 +46,7 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: kf-mpt-${{ github.ref }}
+  group: kf-mpt-main-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
   contract-tests:
@@ -49,29 +62,63 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
           pip install Pillow==11.3.0
-      - name: Secure voice and visual adapter tests
+      - name: Transferred story, voice and visual contract tests
         run: |
           python -m unittest discover -s kayip_frekans -p test_mpt_bridge.py -v
-          python -m py_compile kayip_frekans/mpt_bridge.py
-  preview-or-render:
-    if: github.event_name == 'workflow_dispatch'
+          python -m unittest discover -s kayip_frekans -p test_mpt_profile.py -v
+          python -m py_compile kayip_frekans/mpt_bridge.py kayip_frekans/mpt_profile.py
+  story-brief:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'brief'
     needs: contract-tests
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 5
     env:
-      MIN_SECONDS: ${{ inputs.mode == 'preview' && '20' || '900' }}
-      MAX_SECONDS: ${{ inputs.mode == 'preview' && '90' || '1200' }}
+      STORY_TOPIC: ${{ inputs.topic }}
+      TARGET_MINUTES: ${{ inputs.target_minutes }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Carry over the original bot story rules (no TTS or paid API)
+        run: |
+          python -u kayip_frekans/mpt_profile.py \
+            --topic "$STORY_TOPIC" --minutes "$TARGET_MINUTES" \
+            --output output/mpt/story-brief.json
+      - name: Save writing brief only - not a generated video
+        uses: actions/upload-artifact@v4
+        with:
+          name: KAYIP-FREKANS-MPT-STORY-BRIEF-${{ github.run_number }}
+          path: output/mpt/story-brief.json
+          retention-days: 7
+  preview-or-render:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode != 'brief'
+    needs: contract-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+      TARGET_MINUTES: ${{ inputs.target_minutes }}
+      MIN_SECONDS: ${{ inputs.mode == 'preview' && '20' || '900' }}
+      MAX_SECONDS: ${{ inputs.mode == 'preview' && '90' || '1200' }}
+      PREVIEW_FLAG: ${{ inputs.mode == 'preview' && '--preview' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Reject missing source and unsupported target
+        run: |
+          test -n "$SOURCE_RUN_ID" || { echo 'An approved narration and visual input artifact is required'; exit 1; }
+          if [ "$PREVIEW_FLAG" = "" ]; then
+            test "$TARGET_MINUTES" -ge 15 && test "$TARGET_MINUTES" -le 20 || { echo 'Full video target must be 15-20 minutes'; exit 1; }
+          fi
       - name: Install local free preflight tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
           pip install Pillow==11.3.0
-      - name: Download user-approved production INPUT artifact
+      - name: Download the user-approved production INPUT artifact
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.artifact_name }}
@@ -79,13 +126,20 @@ jobs:
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
           path: input
-      - name: Require approved narrator and reviewed scene assets
+      - name: Apply KAYIP FREKANS story rules and verify tok narrator approval
+        run: |
+          if [ "$PREVIEW_FLAG" = "--preview" ]; then TARGET_MINUTES=1; fi
+          python -u kayip_frekans/mpt_profile.py \
+            --story input/story.txt --approval input/approval.json \
+            --minutes "$TARGET_MINUTES" $PREVIEW_FLAG \
+            --output output/mpt/story-profile.json
+      - name: Require approved complete narration and reviewed local scene assets
         run: |
           python -u kayip_frekans/mpt_bridge.py \
             --package input \
             --min-seconds "$MIN_SECONDS" --max-seconds "$MAX_SECONDS" \
             --report output/mpt/preflight.json
-      - name: Fetch the audited MIT-licensed MoneyPrinterTurbo commit
+      - name: Fetch audited MIT-licensed MoneyPrinterTurbo commit
         if: inputs.run_video == true
         run: |
           mkdir -p upstream/MoneyPrinterTurbo
@@ -97,12 +151,12 @@ jobs:
           test -f upstream/MoneyPrinterTurbo/LICENSE
       - uses: astral-sh/setup-uv@v6
         if: inputs.run_video == true
-      - name: Install upstream free software dependencies
+      - name: Install MoneyPrinterTurbo free software dependencies
         if: inputs.run_video == true
         run: |
           cd upstream/MoneyPrinterTurbo
           uv sync --frozen --no-dev
-      - name: Render with ONLY approved Serkan narration (no auto-TTS)
+      - name: Assemble with approved tok narration ONLY (no auto-TTS)
         if: inputs.run_video == true
         run: |
           cd upstream/MoneyPrinterTurbo
@@ -112,7 +166,7 @@ jobs:
             --min-seconds "$MIN_SECONDS" --max-seconds "$MAX_SECONDS" \
             --report "$GITHUB_WORKSPACE/output/mpt/preflight.json" \
             --execute
-      - name: Preserve review-only results - NEVER auto-publish to YouTube
+      - name: Review-only files - NEVER auto-publish to YouTube
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -121,5 +175,6 @@ jobs:
           retention-days: 1
           compression-level: 0
           path: |
+            output/mpt/story-profile.json
             output/mpt/preflight.json
             upstream/MoneyPrinterTurbo/storage/tasks/**/*.mp4
