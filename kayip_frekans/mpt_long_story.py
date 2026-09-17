@@ -1,9 +1,8 @@
-"""Generate a serious long-form KAYIP FREKANS_ story with Ollama.
+"""Generate a KAYIP FREKANS_ long story with bounded self-repair.
 
-The story starts with a concrete hook and places the short channel intro after
-that hook. Story generation uses bounded retries and a reference-video-derived
-quality contract. Optional internet research is limited to short public factual /
-folklore context; source wording is never copied into the final script.
+A weak chapter is rewritten, a broken story is replanned and quality is
+rechecked. Optional public folklore notes are cited, not copied verbatim.
+Never use an incomplete story as video narration.
 """
 from __future__ import annotations
 
@@ -19,15 +18,11 @@ import bot
 import cloud_v3
 import mpt_profile
 import mpt_reference_style
+import mpt_story_recovery
 
 
 def stable_ask(prompt: str, structured: bool = False):
-    """Ollama chat with bounded resources and retries for transient failures.
-
-    Long Turkish chapters repeatedly hit the former 1600-token output limit.
-    Give the model an adequate generation budget without silently accepting
-    incomplete chapters or malformed JSON.
-    """
+    """Call the local Ollama model, retrying network and truncated output."""
     last_error = None
     for attempt, delay in enumerate((0, 8, 18, 30), start=1):
         if delay:
@@ -58,27 +53,38 @@ def stable_ask(prompt: str, structured: bool = False):
             headers={"Content-Type": "application/json"},
         )
         try:
-            print(f"Model yaniti bekleniyor ({attempt}/4; token budget={token_budget}).", flush=True)
+            print(f"Model yanıtı bekleniyor ({attempt}/4, token={token_budget}).", flush=True)
             with urllib.request.urlopen(request, timeout=600) as response:
                 result = json.load(response)
             if result.get("done_reason") == "length":
-                print(f"Ollama output truncated at {token_budget} tokens; incomplete answer rejected.", flush=True)
-                raise ValueError("Metin token sinirinda kesildi")
+                raise ValueError("Metin token sınırında kesildi")
             text = str(result["message"]["content"]).strip()
             if not text:
-                raise ValueError("Model bos yanit verdi")
+                raise ValueError("Model boş yanıt verdi")
             return json.loads(text) if structured else text
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError,
                 json.JSONDecodeError, KeyError, ValueError) as exc:
             last_error = exc
             status = getattr(exc, "code", None)
-            print(f"Ollama hata (deneme {attempt}/4, HTTP={status}): {type(exc).__name__}: {str(exc)[:160]}", flush=True)
+            print(f"Ollama tekrar denenecek ({attempt}/4, HTTP={status}): "
+                  f"{type(exc).__name__}: {str(exc)[:160]}", flush=True)
             try:
                 with urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=20) as response:
                     response.read(256)
             except Exception:
                 pass
-    raise RuntimeError(f"Ollama four attempts failed: {type(last_error).__name__}: {str(last_error)[:160]}") from last_error
+    raise RuntimeError(
+        f"Ollama dört denemede yanıt veremedi: {type(last_error).__name__}: "
+        f"{str(last_error)[:160]}"
+    ) from last_error
+
+
+def _write(path: Path, value) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
 
 def compose(topic: str, minutes: int, output: Path) -> dict:
@@ -87,72 +93,82 @@ def compose(topic: str, minutes: int, output: Path) -> dict:
     output.mkdir(parents=True, exist_ok=True)
 
     research = mpt_reference_style.gather_research(topic)
-    (output / "research_sources.json").write_text(
-        json.dumps(research, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    _write(output / "research_sources.json", research)
     research_context = mpt_reference_style.research_prompt(research)
 
-    # Reuse the existing planner/editor but strengthen its system contract so
-    # chapters feel like grounded testimony rather than generic AI horror.
-    cloud_v3.ask = stable_ask
     cloud_v3.SYSTEM = (
-        cloud_v3.SYSTEM
-        + "\n\n"
-        + mpt_reference_style.STYLE_BRIEF
-        + "\n\nARAŞTIRMA BAĞLAMI:\n"
-        + research_context[:3200]
+        cloud_v3.SYSTEM + "\n\n" + mpt_reference_style.STYLE_BRIEF
+        + "\n\nARAŞTIRMA BAĞLAMI:\n" + research_context[:3200]
     )
 
-    title, parts, report = cloud_v3.create_story(topic, minutes, preview=False)
-    if len(parts) < 2:
-        raise ValueError("Long story did not contain story chapters")
-
-    intro = parts[0].strip()
-    chapters = [p.strip() for p in parts[1:] if p.strip()]
-    story_only = "\n\n".join(chapters)
-    story_check = mpt_profile.check_story(story_only, minutes, preview=False)
-
-    # A separate editorial pass scores the actual result instead of trusting the
-    # generator. Low-quality, generic or incoherent stories stop before TTS/render.
-    quality_raw = stable_ask(
-        mpt_reference_style.quality_prompt(story_only, topic, minutes),
-        structured=True,
-    )
-    quality = mpt_reference_style.validate_quality(quality_raw)
-    (output / "reference_style_quality.json").write_text(
-        json.dumps({"raw": quality_raw, "validated": quality}, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-
-    first_sentences = bot.sentences(chapters[0])
-    if len(first_sentences) < 3:
-        raise ValueError("Opening chapter is too short for a hook-first intro")
-    hook = []
-    hook_words = 0
-    split_at = 0
-    for index, sentence in enumerate(first_sentences):
-        hook.append(sentence)
-        hook_words += len(sentence.split())
-        split_at = index + 1
-        if hook_words >= 38 and index >= 1:
+    # Restart from a fresh outline on story-wide problems. Chapter-level repairs
+    # happen inside mpt_story_recovery; never mark an unchecked draft as approved.
+    failures = []
+    for attempt in range(1, 3):
+        revised_topic = topic
+        if failures:
+            revised_topic += "\nÖnceki taslakta düzeltilecek sorun: " + failures[-1][-350:]
+        try:
+            title, parts, report = mpt_story_recovery.generate_story(
+                revised_topic, minutes, stable_ask, output,
+                research_context=research_context, max_story_attempts=2,
+            )
+            if len(parts) < 2:
+                raise ValueError("Uzun hikâyede bölüm yok")
+            intro = parts[0].strip()
+            chapters = [p.strip() for p in parts[1:] if p.strip()]
+            story_only = "\n\n".join(chapters)
+            story_check = mpt_profile.check_story(story_only, minutes, preview=False)
+            quality_raw = stable_ask(
+                mpt_reference_style.quality_prompt(story_only, topic, minutes),
+                structured=True,
+            )
+            _write(output / "reference_style_quality.json", {"raw": quality_raw})
+            quality = mpt_reference_style.validate_quality(quality_raw)
+            _write(output / "reference_style_quality.json", {
+                "raw": quality_raw, "validated": quality,
+                "full_story_attempt": attempt,
+            })
+            first_sentences = bot.sentences(chapters[0])
+            if len(first_sentences) < 3:
+                raise ValueError("Açılışta yeterince cümle yok")
+            hook = []
+            hook_words = 0
+            split_at = 0
+            for index, sentence in enumerate(first_sentences):
+                hook.append(sentence)
+                hook_words += len(sentence.split())
+                split_at = index + 1
+                if hook_words >= 38 and index >= 1:
+                    break
+            if hook_words < 25:
+                raise ValueError("Açılış kancası çok kısa")
+            opening_rest = " ".join(first_sentences[split_at:]).strip()
+            narration_parts = [" ".join(hook), intro]
+            if opening_rest:
+                narration_parts.append(opening_rest)
+            narration_parts.extend(chapters[1:])
+            narration = "\n\n".join(narration_parts).strip()
+            if narration.casefold().startswith("merhaba"):
+                raise ValueError("Kanal açılışı korku kancasından önce yerleştirilmiş")
+            if "Kayıp Frekans" not in intro:
+                raise ValueError("Kanal tanıtımı eksik")
             break
-    if hook_words < 25:
-        raise ValueError("Opening hook is too short")
+        except (ValueError, RuntimeError, KeyError, TypeError) as exc:
+            failure = f"Baştan üretim {attempt}/2: {type(exc).__name__}: {str(exc)[:750]}"
+            failures.append(failure)
+            _write(output / "recovery_failures.json", failures)
+            print(f"Hikâye kalite/üretim hatası; baştan yazılacak: {failure}", flush=True)
+            if attempt == 2:
+                raise RuntimeError(
+                    "Hikâye dört tam taslak ve bölüm onarımlarından sonra da "
+                    "kaliteyi sağlayamadı; eksik/kötü hikâye seslendirmeye gönderilmedi. "
+                    + failure
+                ) from exc
+            time.sleep(5)
 
-    opening_rest = " ".join(first_sentences[split_at:]).strip()
-    narration_parts = [" ".join(hook), intro]
-    if opening_rest:
-        narration_parts.append(opening_rest)
-    narration_parts.extend(chapters[1:])
-    narration = "\n\n".join(narration_parts).strip()
-
-    if narration.casefold().startswith("merhaba"):
-        raise ValueError("Channel intro was incorrectly placed before the hook")
-    if "Kayıp Frekans" not in intro:
-        raise ValueError("Channel intro is missing")
-
-    (output / "story.txt").write_text(story_only + "\n", encoding="utf-8")
-    (output / "narration_script.txt").write_text(narration + "\n", encoding="utf-8")
+    _write(output / "story.txt", story_only + "\n")
+    _write(output / "narration_script.txt", narration + "\n")
     state = {
         "title": title,
         "topic": topic,
@@ -165,15 +181,15 @@ def compose(topic: str, minutes: int, output: Path) -> dict:
         "reference_style_quality": quality,
         "research": research,
         "editor_report": report,
+        "recovery_failures": failures,
+        "full_story_attempt": attempt,
         "hook_first": True,
         "channel_intro_after_hook": True,
         "internet_research_used": bool(research.get("items")),
         "source_story_copied": False,
         "youtube_uploaded": False,
     }
-    (output / "story_state.json").write_text(
-        json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    _write(output / "story_state.json", state)
     print(json.dumps({
         "title": title,
         "story_words": state["story_words"],
@@ -182,6 +198,7 @@ def compose(topic: str, minutes: int, output: Path) -> dict:
         "hook_first": True,
         "reference_style_score": quality["total"],
         "internet_research_used": state["internet_research_used"],
+        "recovery_attempt": attempt,
     }, ensure_ascii=False), flush=True)
     return state
 
