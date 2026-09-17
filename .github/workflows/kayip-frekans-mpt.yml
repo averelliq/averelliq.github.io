@@ -16,6 +16,14 @@ on:
         type: string
         required: true
         default: KAYIP-FREKANS-MPT-INPUT
+      mode:
+        description: Kisa teknik deneme veya 15-20 dakika
+        type: choice
+        required: true
+        default: preview
+        options:
+          - preview
+          - full
       run_video:
         description: Paket kontrollerinden sonra MPT ile MP4 olustur (varsayilan KAPALI)
         type: boolean
@@ -30,14 +38,17 @@ concurrency:
 jobs:
   contract-tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Test library
-        run: pip install Pillow==11.3.0
+      - name: Test libraries and FFprobe
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          pip install Pillow==11.3.0
       - name: Secure voice and visual adapter tests
         run: |
           python -m unittest discover -s kayip_frekans -p test_mpt_bridge.py -v
@@ -47,6 +58,9 @@ jobs:
     needs: contract-tests
     runs-on: ubuntu-24.04
     timeout-minutes: 180
+    env:
+      MIN_SECONDS: ${{ inputs.mode == 'preview' && '20' || '900' }}
+      MAX_SECONDS: ${{ inputs.mode == 'preview' && '90' || '1200' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -65,10 +79,11 @@ jobs:
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
           path: input
-      - name: Require approved full-length narrator and reviewed scene assets
+      - name: Require approved narrator and reviewed scene assets
         run: |
           python -u kayip_frekans/mpt_bridge.py \
             --package input \
+            --min-seconds "$MIN_SECONDS" --max-seconds "$MAX_SECONDS" \
             --report output/mpt/preflight.json
       - name: Fetch the audited MIT-licensed MoneyPrinterTurbo commit
         if: inputs.run_video == true
@@ -87,13 +102,14 @@ jobs:
         run: |
           cd upstream/MoneyPrinterTurbo
           uv sync --frozen --no-dev
-      - name: Render with ONLY the approved Serkan narration (no auto-TTS)
+      - name: Render with ONLY approved Serkan narration (no auto-TTS)
         if: inputs.run_video == true
         run: |
           cd upstream/MoneyPrinterTurbo
           uv run --frozen python "$GITHUB_WORKSPACE/kayip_frekans/mpt_bridge.py" \
             --package "$GITHUB_WORKSPACE/input" \
             --upstream-dir "$GITHUB_WORKSPACE/upstream/MoneyPrinterTurbo" \
+            --min-seconds "$MIN_SECONDS" --max-seconds "$MAX_SECONDS" \
             --report "$GITHUB_WORKSPACE/output/mpt/preflight.json" \
             --execute
       - name: Preserve review-only results - NEVER auto-publish to YouTube
