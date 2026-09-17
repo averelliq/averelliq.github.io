@@ -1,0 +1,202 @@
+name: KAYIP FREKANS - CIDDI UZUN MPT TESTI
+on:
+  push:
+    paths:
+      - kayip_frekans/mpt_long_story.py
+      - kayip_frekans/mpt_long_test.py
+      - .github/workflows/kayip-frekans-mpt-long-serious.yml
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: Uzun cinli hikaye konusu
+        type: string
+        required: true
+        default: Kapinin oteki tarafindan olen kardesimin sesi geliyor; ses giderek evin icine tasiniyor
+      target_minutes:
+        description: Ciddi test hedefi (15-20 dakika)
+        type: choice
+        required: true
+        default: '15'
+        options:
+          - '15'
+          - '18'
+          - '20'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: kf-mpt-serious-long-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TOPIC: ${{ github.event_name == 'workflow_dispatch' && inputs.topic || 'Kapinin oteki tarafindan olen kardesimin sesi geliyor; ses giderek evin icine tasiniyor' }}
+  TARGET_MINUTES: ${{ github.event_name == 'workflow_dispatch' && inputs.target_minutes || '15' }}
+
+jobs:
+  story:
+    name: 1 - Uzun cinli hikaye ve kanal girisi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Ucretsiz hikaye motorunu kur
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core curl
+          python -m pip install --upgrade pip
+          pip install Pillow==11.3.0
+          curl --fail --location --retry 3 https://ollama.com/install.sh -o /tmp/install-ollama.sh
+          sh /tmp/install-ollama.sh
+          ollama serve >/tmp/ollama.log 2>&1 &
+          for attempt in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:11434/api/tags >/dev/null
+          ollama pull gemma3:4b
+      - name: Hook ile baslayan 15-20 dk cinli hikayeyi yaz ve girisi hook sonrasina koy
+        timeout-minutes: 120
+        run: |
+          python -u kayip_frekans/mpt_long_story.py \
+            --topic "$TOPIC" \
+            --minutes "$TARGET_MINUTES" \
+            --output output/long-test
+      - name: Hikaye paketini sonraki asamaya aktar
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KF-LONG-STORY
+          retention-days: 2
+          if-no-files-found: warn
+          path: |
+            output/long-test/story.txt
+            output/long-test/narration_script.txt
+            output/long-test/story_state.json
+
+  prepare:
+    name: 2 - Tok anlatim ve hikayeye uygun gorseller
+    needs: story
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    env:
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      HF_HUB_DISABLE_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Hikaye paketini al
+        uses: actions/download-artifact@v4
+        with:
+          name: KF-LONG-STORY
+          path: output/long-test
+      - name: Sadece kullanicinin onayladigi tok deneme WAV dosyasini al
+        uses: actions/download-artifact@v4
+        with:
+          run-id: '35222626464'
+          name: KAYIP-FREKANS-V6-REFERANS-SES-TESTI
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          path: input/audio
+      - name: Ucretsiz Chatterbox CPU ses motorunu ve gorsel araclarini kur
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0 torchaudio==2.6.0
+          pip install chatterbox-tts==0.1.7 soundfile Pillow==11.3.0
+      - name: Tok sesle tam anlatim adayini ve sahne gorsellerini uret
+        timeout-minutes: 270
+        run: |
+          python -u kayip_frekans/mpt_long_test.py \
+            --stage prepare \
+            --workspace "$GITHUB_WORKSPACE" \
+            --approved-audio "$GITHUB_WORKSPACE/input/audio/serkan-v6-2-tok.wav" \
+            --target-minutes "$TARGET_MINUTES"
+      - name: Hazirlanan uzun paket - YAYIN DEGIL
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KF-LONG-PREPARED
+          retention-days: 2
+          if-no-files-found: warn
+          compression-level: 0
+          path: |
+            output/long-test/story.txt
+            output/long-test/narration_script.txt
+            output/long-test/story_state.json
+            output/long-test/narration.wav
+            output/long-test/captions.srt
+            output/long-test/tts_report.json
+            output/long-test/prepare_report.json
+            output/long-test/scene_assets.json
+            output/long-test/visual_credits.json
+            output/long-test/visual_credits.txt
+            output/long-test/scenes/*.jpg
+
+  render:
+    name: 3 - MoneyPrinterTurbo uzun video montaji
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Hazir hikaye ses ve sahne paketini al
+        uses: actions/download-artifact@v4
+        with:
+          name: KF-LONG-PREPARED
+          path: output/long-test
+      - name: FFmpeg ve fontlari kur
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          pip install Pillow==11.3.0
+      - name: Denetlenmis MoneyPrinterTurbo surumunu al
+        run: |
+          mkdir -p upstream/MoneyPrinterTurbo
+          git -C upstream/MoneyPrinterTurbo init
+          git -C upstream/MoneyPrinterTurbo remote add origin https://github.com/harry0703/MoneyPrinterTurbo.git
+          git -C upstream/MoneyPrinterTurbo fetch --depth 1 --filter=blob:none origin 633dbb0cf6866e817a023f30c5ac20c6cf3f76de
+          git -C upstream/MoneyPrinterTurbo checkout --detach FETCH_HEAD
+          test "$(git -C upstream/MoneyPrinterTurbo rev-parse HEAD)" = '633dbb0cf6866e817a023f30c5ac20c6cf3f76de'
+          test -f upstream/MoneyPrinterTurbo/LICENSE
+      - uses: astral-sh/setup-uv@v6
+      - name: MoneyPrinterTurbo ucretsiz bagimliliklarini kur
+        run: |
+          cd upstream/MoneyPrinterTurbo
+          uv sync --frozen --no-dev
+      - name: Gercek uzun MP4 montajini yap - tok ses, altyazi, atmosfer
+        timeout-minutes: 100
+        run: |
+          cd upstream/MoneyPrinterTurbo
+          uv run --frozen python "$GITHUB_WORKSPACE/kayip_frekans/mpt_long_test.py" \
+            --stage render \
+            --workspace "$GITHUB_WORKSPACE" \
+            --upstream "$GITHUB_WORKSPACE/upstream/MoneyPrinterTurbo" \
+            --target-minutes "$TARGET_MINUTES"
+      - name: Inceleme videosunu kaydet - YouTube yukleme YOK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KAYIP-FREKANS-MPT-CIDDI-UZUN-TEST-${{ github.run_number }}
+          retention-days: 7
+          if-no-files-found: warn
+          compression-level: 0
+          path: |
+            output/long-test/KAYIP_FREKANS_MPT_UZUN_TEST.mp4
+            output/long-test/thumbnail.jpg
+            output/long-test/story.txt
+            output/long-test/narration_script.txt
+            output/long-test/captions.srt
+            output/long-test/story_state.json
+            output/long-test/tts_report.json
+            output/long-test/prepare_report.json
+            output/long-test/final_report.json
+            output/long-test/visual_credits.txt
