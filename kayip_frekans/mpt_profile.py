@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 
 from quality import normalize_for_speech
+import mpt_reference_style
 
 CHANNEL = 'KAYIP FREKANS_'
 VOICE_ID = 'serkan-v6-2-tok'
@@ -21,11 +22,12 @@ RULES = {
     'channel': CHANNEL,
     'language': 'tr-TR',
     'format': '16:9 landscape; long-form paranormal/cin horror',
-    'narrative_person': 'first-person eyewitness; stable, named characters',
+    'narrative_person': 'first-person eyewitness; grounded testimony; stable named characters',
     'hook': 'Start with a concrete frightening event in the first 15-20 seconds; no channel greeting first.',
     'rhythm': 'Introduce a meaningful new question/clue/escalation approximately every 45-90 seconds.',
     'opening': 'Keep the first 2 minutes fast and necessary; do not over-explain backstory.',
     'causality': 'Plant clues before payoff; maintain geography, chronology, objects and supernatural rules.',
+    'reference_story_style': 'matter-of-fact lived-in testimony; mundane detail -> evidence -> escalation -> consequence -> payoff/aftermath',
     'ending': 'Resolve the main question with earned payoff; no accidental cut-off or duplicate chapters.',
     'turkish': 'Natural, idiomatic Turkish; read clocks as spoken Turkish, never English digits.',
     'avoid_phrases': ['Final Story', 'Gece Arşivi', 'ışık izi oluştu', 'çatlak sesi'],
@@ -38,12 +40,23 @@ RULES = {
     },
     'visuals': {
         'story_matched_assets_only': True,
+        'moving_broll_preferred': True,
+        'preferred_shot_seconds': '18-35',
+        'soft_transitions': True,
         'stable_character_appearances': True,
+        'avoid_random_faces': True,
         'no_random_abstract_fallback': True,
         'no_repeated_blurry_or_black_frames': True,
         'human_review_required': True,
     },
+    'research': {
+        'public_factual_or_folklore_context_allowed': True,
+        'copy_source_story': False,
+        'attribute_real_people_with_fictional_supernatural_crimes': False,
+        'save_source_provenance': True,
+    },
     'quality_gates': {
+        'reference_style_score_required': True,
         'no_youtube_autopublish': True,
         'verify_full_audio_and_its_sha256': True,
         'check_duration_and_scene_timeline': True,
@@ -68,6 +81,7 @@ def story_brief(topic: str, minutes: int) -> str:
         'Saatleri Türkçe sözcüklerle yaz: 03:15 yerine gece üç on beş; 22:30 yerine gece on buçuk. '
         'Yalnızca okunacak hikâye metnini üret; Final Story, Gece Arşivi veya bölüm işaretleri yazma. '
         'Metni özetleme ya da yarıda bitirme. Her karakter ve mekân için sahne planında tutarlı görsel açıklaması hazırla.\n'
+        + mpt_reference_style.STYLE_BRIEF + '\n'
         'ÖNEMLİ: Bu talimat yalnızca senaryo içindir. Tok anlatıcı sesini oluşturduğunu veya görselleri onayladığını iddia etme.'
     )
 
@@ -94,12 +108,17 @@ def check_story(text: str, minutes: int, preview: bool = False) -> dict:
         raise ValueError('A long story paragraph was duplicated')
     if not re.search('[çğıöşüÇĞİÖŞÜ]', text):
         raise ValueError('Turkish characters missing; check UTF-8 corruption')
+    cliches = sum(text.casefold().count(x) for x in (
+        'kanım dondu', 'gözlerime inanamadım', 'tarif edemediğim bir korku', 'nefesim kesildi'))
+    if cliches > 4:
+        raise ValueError('Story relies too heavily on generic horror cliches')
     return {
         'channel': CHANNEL,
         'story_words': len(words),
         'target_minutes': minutes,
         'preview': bool(preview),
         'editorial_mechanical_checks_passed': True,
+        'reference_style_quality_gate_required': not preview,
         'character_continuity_verified': False,
         'voice_similarity_verified': False,
         'visual_story_match_verified': False,
