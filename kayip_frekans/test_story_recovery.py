@@ -46,6 +46,38 @@ class RecoveryTests(unittest.TestCase):
             self.assertTrue((Path(folder) / "accepted.txt").is_file())
             self.assertTrue((Path(folder) / "last_failure.txt").is_file())
 
+    def test_irrelevant_editor_json_retries_without_rewriting_chapters(self):
+        replies = iter([{"title": "Karanlığın Yankıları", "author": "AI"},
+                        {}, {"pass": True, "issues": []}])
+        with tempfile.TemporaryDirectory() as folder:
+            draft = Path(folder)
+            result = mpt_story_recovery._review_story(
+                "Kapı çarptı, kardeşimin sesini duydum.",
+                lambda prompt, structured=False: next(replies), draft)
+            self.assertEqual(result["status"], "verified_by_local_editor")
+            self.assertEqual(result["attempts"], 3)
+            self.assertTrue((draft / "editor_review_attempt_1.json").exists())
+            self.assertFalse((draft / "editor_unavailable.json").exists())
+
+    def test_editor_wrong_schema_never_claims_pass(self):
+        with tempfile.TemporaryDirectory() as folder:
+            draft = Path(folder)
+            result = mpt_story_recovery._review_story(
+                "İlk ipucu eski saat, son ipucu eski saat.",
+                lambda prompt, structured=False: {"title": "Yanlış şema"}, draft)
+            self.assertIsNone(result["pass"])
+            self.assertTrue(result["requires_independent_quality_gate"])
+            self.assertTrue((draft / "editor_unavailable.json").exists())
+
+    def test_concrete_editor_issue_still_blocks_bad_story(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaises(mpt_story_recovery.StoryExhausted):
+                mpt_story_recovery._review_story(
+                    "Karakterin ismi başta Ali sonda Ayşe oldu.",
+                    lambda prompt, structured=False: {
+                        "issues": ["Anlatıcının ismi gerekçesiz Ali'den Ayşe'ye değişiyor"],
+                        "pass": False}, Path(folder))
+
     def test_four_failed_chapter_attempts_trigger_new_outline(self):
         count, outlines = 0, 0
         def fake_ask(prompt, structured=False):
@@ -71,6 +103,7 @@ class RecoveryTests(unittest.TestCase):
             self.assertEqual(count, 16)
             self.assertEqual(len(parts), 13)
             self.assertEqual(report["story_attempt"], 2)
+            self.assertTrue(report["independent_quality_gate_required"])
             self.assertTrue((Path(folder) / "recovery" / "story-1" / "failure.txt").is_file())
             self.assertTrue((Path(folder) / "recovery" / "story-2" / "story_only.txt").is_file())
             self.assertIn("Köydeki Ses", title)
