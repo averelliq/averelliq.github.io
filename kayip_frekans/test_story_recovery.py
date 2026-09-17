@@ -13,6 +13,28 @@ class RecoveryTests(unittest.TestCase):
         self.assertIn("Cin görünmesi, kapı çarpması, çığlık", mpt_reference_style.STYLE_BRIEF)
         self.assertIn("ASLA tek başına kusur değildir", mpt_reference_style.quality_prompt("Cin gördüm.", "köy", 15))
 
+    def test_incomplete_outline_is_expanded_not_rejected(self):
+        def short_outline(prompt, structured=False):
+            return {"title": "Ölen Kardeşimin Sesi", "characters": "İki kardeş ve komşu",
+                    "setting": "Köy evi", "rules": "Kapı kilitli kalır", "clues": "Eski saat",
+                    "chapters": ["Kilitli kapıdan tanıdık ses duyulur", "Komşu eski saatin sırrını açıklar",
+                                 "Görünmeyen varlık eve girer", "Saat ve kardeşin sesi finalde birleşir"]}
+        plan = mpt_story_recovery._outline("Köydeki kapı", 12, short_outline, "")
+        self.assertEqual(len(plan["chapters"]), 12)
+        self.assertEqual(plan["outline_source_beats"], 4)
+        self.assertEqual(plan["outline_mode"], "model_beats_expanded")
+        self.assertEqual(len(set(plan["chapters"])), 12)
+        self.assertIn("final", plan["chapters"][-1].lower())
+
+    def test_empty_outline_uses_story_scaffold_not_fake_narration(self):
+        with patch.object(mpt_story_recovery.time, "sleep", return_value=None):
+            plan = mpt_story_recovery._outline(
+                "Ölen kardeşimin sesi kilitli kapıdan geldi", 12,
+                lambda prompt, structured=False: {"chapters": []}, "")
+        self.assertEqual(plan["outline_mode"], "topic_grounded_scaffold")
+        self.assertEqual(len(plan["chapters"]), 12)
+        self.assertIn("ipucu", plan["chapters"][-1].lower())
+
     def test_bad_chapter_is_rewritten_not_silently_accepted(self):
         responses = iter(["bozuk metin", "Gece köydeki kapı içeriden çarptı ve kardeşimin sesini duydum."])
         with tempfile.TemporaryDirectory() as folder:
