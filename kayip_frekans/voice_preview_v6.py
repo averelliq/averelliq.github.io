@@ -1,7 +1,8 @@
-"""V6 voice audition. Does NOT use Ahmet/Edge as a source speaker.
+"""V6 direct Turkish reference voice audition (not Edge/Ahmet).
 
-A short direct zero-shot cloning experiment, NOT a long-video generator. The
-underlying model has bounded output; do not advertise one-call 20-minute speech.
+This creates three short listening samples, NOT one-call long-form TTS.
+The pinned PyPI chatterbox-tts==0.1.7 does not accept a t3_model argument;
+its default multilingual checkpoint is used. No voice match is assumed.
 """
 from __future__ import annotations
 
@@ -39,7 +40,7 @@ def probe_seconds(path: Path) -> float:
 
 
 def load_reference(out: Path, fallback: Path) -> tuple[Path, bool]:
-    """Prefer a GitHub Actions secret; never print or export its contents."""
+    """Prefer an Actions secret containing the original MP3; never print/export it."""
     encoded = os.getenv('KF_FULL_REFERENCE_B64', '').strip()
     if encoded:
         raw = base64.b64decode(encoded, validate=True)
@@ -49,8 +50,7 @@ def load_reference(out: Path, fallback: Path) -> tuple[Path, bool]:
         ref.write_bytes(raw)
         from_secret = True
     else:
-        # Existing repository reference is a roughly ten-second EXCERPT,
-        # NOT the 44.5-second recording. Never mislabel it as the full file.
+        # Repository currently has a roughly ten-second EXCERPT, not the 44.5s original.
         import cloud_v4
         ref = cloud_v4.materialize_reference()
         from_secret = False
@@ -66,10 +66,9 @@ def audition(output: Path, fallback: Path | None = None) -> dict:
     duration = probe_seconds(ref)
     full_reference = from_secret and 35 <= duration <= 60
 
-    # Chatterbox internally conditions on an approximately 10-second window.
-    # For the FULL recording, sample three DISTINCT positions across its length.
-    # Supplying all 44s as one file would NOT make the model use all 44s at once.
-    offsets = [0.0, max(0.0, (duration-10)/2), max(0.0, duration-10)]
+    # Each model call conditions on ~10s, not the entire original at once.
+    # Cover beginning, middle and end when a full recording is provided.
+    offsets = [0.0, max(0.0, (duration - 10) / 2), max(0.0, duration - 10)]
     for i, offset in enumerate(offsets):
         subprocess.run([
             'ffmpeg', '-v', 'error', '-y', '-ss', f'{offset:.3f}', '-i', str(ref),
@@ -85,7 +84,9 @@ def audition(output: Path, fallback: Path | None = None) -> dict:
         raise RuntimeError('Requires chatterbox-tts, torch and soundfile') from exc
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = ChatterboxMultilingualTTS.from_pretrained(device=device, t3_model='v3')
+    # PyPI version 0.1.7 signature: from_pretrained(device); t3_model='v3'
+    # exists in newer upstream sources but NOT this pinned release.
+    model = ChatterboxMultilingualTTS.from_pretrained(device=device)
     clips = []
     for i, (name, exaggeration, cfg_weight) in enumerate(SETTINGS):
         torch.manual_seed(2026)
@@ -102,13 +103,15 @@ def audition(output: Path, fallback: Path | None = None) -> dict:
         target = output / f'serkan-v6-{i+1}-{name}.wav'
         sf.write(str(target), audio, model.sr, subtype='PCM_16')
         clips.append({
-            'file': target.name, 'reference_window_start_seconds': round(offsets[i], 3),
-            'duration_seconds': round(len(audio)/model.sr, 2),
-            'exaggeration': exaggeration, 'cfg_weight': cfg_weight,
+            'file': target.name,
+            'reference_window_start_seconds': round(offsets[i], 3),
+            'duration_seconds': round(len(audio) / model.sr, 2),
+            'exaggeration': exaggeration,
+            'cfg_weight': cfg_weight,
         })
 
     report = {
-        'engine': 'ChatterboxMultilingualTTS-v3-direct-reference',
+        'engine': 'ChatterboxMultilingualTTS (chatterbox-tts 0.1.7 default multilingual checkpoint)',
         'source_speaker': 'reference audio (NOT Edge/Ahmet)',
         'reference_duration_seconds': round(duration, 3),
         'full_44s_reference_available': full_reference,
@@ -117,15 +120,15 @@ def audition(output: Path, fallback: Path | None = None) -> dict:
         'human_approval_required': True,
         'voice_similarity_verified': False,
         'full_video_ready': False,
-        'warning': ('Full 44-second reference supplied; listen to all candidates.' if full_reference
-                    else 'Only the previous ~10-second excerpt is available. This is an exploratory audition, NOT a full-reference match.'),
+        'warning': ('Full original reference supplied; listen to every candidate.' if full_reference
+                    else 'Only the previous ~10-second excerpt is available. Exploratory audition, NOT a full-reference match.'),
         'clips': clips,
         'script': SAMPLE,
     }
     (output / 'voice_audition_v6.json').write_text(
         json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8'
     )
-    print(json.dumps({k: v for k, v in report.items() if k not in ('script',)}, ensure_ascii=False), flush=True)
+    print(json.dumps({k: v for k, v in report.items() if k != 'script'}, ensure_ascii=False), flush=True)
     return report
 
 
