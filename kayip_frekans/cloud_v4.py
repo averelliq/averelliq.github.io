@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import json
 import subprocess
 from pathlib import Path
 
@@ -88,8 +87,8 @@ def whole_file_voice_conversion(source_wav: Path, target_ref: Path, output_wav: 
     )
     converter.load_ckpt(str(checkpoint))
 
-    # Speaker embedding extraction may use a short clean seed. The actual
-    # narration conversion below still receives the WHOLE source file once.
+    # Speaker embedding icin kisa temiz ornek yeterlidir. Asil anlatim
+    # asagidaki convert cagrilarinda bolunmeden TAM dosya olarak verilir.
     source_seed = v3.OUT / "source-speaker-seed.wav"
     target_seed = v3.OUT / "serkan-speaker-seed.wav"
     v3.bot.run(
@@ -192,6 +191,46 @@ _old_create_story = v3.create_story
 
 
 def create_story_v4(topic, minutes, preview):
+    if preview:
+        # Push/smoke testinin amaci ses ve video zincirini dogrulamaktir.
+        # Buyuk hikaye modelini indirmeden dogrudan sabit, kontrol edilmis bir
+        # kisa kurmaca kullanir. Manuel normal uretimde V3 hikaye motoru aynen calisir.
+        title = "Kapının Ardındaki Ses"
+        text = (
+            "Gece yarısına doğru mutfaktan üç kez kapı tokmağı sesi geldi. Evde yalnızdım ve dış kapıyı "
+            "uyumadan önce iki kez kontrol etmiştim. Koridora çıktığımda kilit hâlâ yerindeydi. Tam geri "
+            "dönecekken kapının öteki tarafından kardeşimin sesi duyuldu: Abi, aç kapıyı. Oysa kardeşim iki "
+            "yıl önce aynı köy yolunda geçirdiği kazada ölmüştü. Ses ikinci kez adımı söylediğinde ellerim "
+            "soğudu. Kapıya yaklaşmadım. Telefonun ışığını açıp pencereden bahçeye baktım; çamurun üzerinde "
+            "hiç ayak izi yoktu.\n\n"
+            "Bir süre sonra ses kesildi. Bunun rüzgâr ya da televizyondan gelen bir ses olabileceğine kendimi "
+            "inandırmaya çalıştım. Sonra çocukken kardeşimle kullandığımız, ailede başka kimsenin bilmediği "
+            "bir cümle duydum: Işığı söndür, annemiz uyanacak. O an bunun rastlantı olmadığını anladım. Kapının "
+            "altından gölge geçmedi, tokmak oynamadı; yalnızca nefes sesi vardı. Sessizce yatak odasına çekilip "
+            "kapıyı kilitledim.\n\n"
+            "Saat ilerlerken koridor tamamen sustu. Tam tehlikenin geçtiğini düşünürken yatağın karşısındaki "
+            "eski dolabın içinden aynı ses geldi. Bu kez fısıltıyla, Abi, kapıyı açmana gerek kalmadı, dedi. "
+            "Dolabın kapağı birkaç santim aralandı. İçerisi karanlıktı ama alt rafta, kardeşimin yıllar önce "
+            "kaybolan metal anahtarlığı duruyordu. Sabah olduğunda dolabı boş buldum. Dış kapı ise hâlâ içeriden "
+            "kilitliydi. O geceden sonra evde tek başıma kalmadım; çünkü sesin dışarıdan gelmediğini artık biliyordum."
+        )
+        report = {
+            "version": 4,
+            "engine_version": "V4",
+            "preview": True,
+            "human_review_required": True,
+            "story_words": len(text.split()),
+            "target_minutes": minutes,
+            "editor_review": {"issues": [], "pass": True, "mode": "fixed smoke fixture"},
+            "voice_name": "Serkan Demirci - synthetic reference",
+            "narration_mode": "single-stream TTS + whole-file voice conversion",
+            "audio_chunk_merge": False,
+        }
+        v3.save("story_only.txt", text)
+        v3.save("intro.txt", v3.intro_text(title))
+        v3.save("quality_report.json", report)
+        return title, [v3.intro_text(title), text], report
+
     title, parts, report = _old_create_story(topic, minutes, preview)
     report.update({
         "engine_version": "V4",
@@ -199,6 +238,7 @@ def create_story_v4(topic, minutes, preview):
         "narration_mode": "single-stream TTS + whole-file voice conversion",
         "audio_chunk_merge": False,
     })
+    v3.save("quality_report.json", report)
     return title, parts, report
 
 
