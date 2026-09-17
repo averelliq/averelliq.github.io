@@ -1,4 +1,4 @@
-name: KAYIP FREKANS - V13 Serkan Anlatici
+name: KAYIP FREKANS - V14 Ucretsiz Klon Ses
 on:
   workflow_dispatch:
     inputs:
@@ -8,10 +8,10 @@ on:
         type: string
       minutes:
         description: Hedef dakika (5-35; gerçek süre seslendirmeye bağlı)
-        default: '30'
+        default: '5'
         type: string
       test:
-        description: Sadece kısa AI hikayesi ve test videosu
+        description: Kisa AI hikayesi ve test videosu (once bunu secin)
         default: true
         type: boolean
   push:
@@ -38,20 +38,20 @@ jobs:
           python-version: '3.11'
       - name: Test bagimliliklari
         run: pip install Pillow==11.3.0
-      - name: Turkce giris ve kalite testleri
+      - name: Turkce giris ve klon ses testleri (API veya model indirme yok)
         run: python -m unittest discover -s kayip_frekans -p 'test_*.py' -v
       - name: Python sozdizimi
-        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/cloud_v4.py kayip_frekans/cloud_v5.py kayip_frekans/cloud_v6.py kayip_frekans/cloud_v7.py kayip_frekans/cloud_v8.py kayip_frekans/cloud_v9.py kayip_frekans/cloud_v10.py kayip_frekans/cloud_v11.py kayip_frekans/cloud_v12.py kayip_frekans/cloud_v13.py kayip_frekans/serkan_voice.py kayip_frekans/brand_logo.py kayip_frekans/quality.py
+        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/cloud_v4.py kayip_frekans/cloud_v5.py kayip_frekans/cloud_v6.py kayip_frekans/cloud_v7.py kayip_frekans/cloud_v8.py kayip_frekans/cloud_v9.py kayip_frekans/cloud_v10.py kayip_frekans/cloud_v11.py kayip_frekans/cloud_v12.py kayip_frekans/cloud_v13.py kayip_frekans/cloud_v14.py kayip_frekans/clone_voice.py kayip_frekans/serkan_voice.py kayip_frekans/brand_logo.py kayip_frekans/quality.py
   video:
     if: github.event_name == 'workflow_dispatch' && github.event.repository.private == false
     needs: quality
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      SERKAN_REFERENCE_MP3_B64: ${{ secrets.SERKAN_REFERENCE_MP3_B64 }}
       STORY_TOPIC: ${{ inputs.topic }}
-      TARGET_MINUTES: ${{ inputs.minutes || '30' }}
+      TARGET_MINUTES: ${{ inputs.minutes || '5' }}
       SHORT_TEST: ${{ inputs.test }}
       FAST_VISUAL_SMOKE: '0'
       DOCUMENTARY_SHOT_SECONDS: '20'
@@ -61,17 +61,20 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Require selected Serkan voice credentials; do not fall back
+      - name: Ses referansi Secret kontrolu (referans asla yazdirilmaz)
         run: |
-          if [ -z "$ELEVENLABS_API_KEY" ]; then
-            echo 'ELEVENLABS_API_KEY GitHub Actions Secret eksik. Serkan disinda ses kullanilmadi.' >&2
+          if [ -z "$SERKAN_REFERENCE_MP3_B64" ]; then
+            echo 'SERKAN_REFERENCE_MP3_B64 Secret eksik. Klon disinda ses kullanilmadi.' >&2
             exit 1
           fi
-      - name: Video araclarini GitHub sunucusuna kur
+      - name: Ucretsiz bulut araclarini ve MIT lisansli Turkce klonlama modelini kur
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg fonts-dejavu-core
           pip install -r kayip_frekans/requirements.txt
+          pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install chatterbox-tts==0.1.7
+          python -c 'import sys; sys.path.insert(0,"kayip_frekans"); import clone_voice; folder,reference=clone_voice.require_reference(); folder.cleanup(); print("Private voice reference validated")'
           curl --fail --location --retry 3 https://ollama.com/install.sh -o /tmp/install-ollama.sh
           sh /tmp/install-ollama.sh
           ollama serve >/tmp/ollama.log 2>&1 &
@@ -84,16 +87,16 @@ jobs:
         timeout-minutes: ${{ inputs.test != true && 120 || 15 }}
         run: |
           if [ "$SHORT_TEST" = "true" ]; then
-            python -u kayip_frekans/cloud_v13.py --stage story --smoke
+            python -u kayip_frekans/cloud_v14.py --stage story --smoke
           else
-            python -u kayip_frekans/cloud_v13.py --stage story
+            python -u kayip_frekans/cloud_v14.py --stage story
           fi
-      - name: Sadece Serkan Demirci sesi ve dogru zamanli altyazi
-        timeout-minutes: 30
-        run: python -u kayip_frekans/cloud_v13.py --stage narration
-      - name: Orijinal logolu giris ve 1080p belgesel montaji
+      - name: ElevenLabs kredisi kullanmadan Serkan referansiyla Turkce seslendir
+        timeout-minutes: 160
+        run: python -u kayip_frekans/cloud_v14.py --stage narration
+      - name: Logolu 1080p montaj (altyazi zamanlamasi tahminidir)
         timeout-minutes: 75
-        run: python -u kayip_frekans/cloud_v13.py --stage render
+        run: python -u kayip_frekans/cloud_v14.py --stage render
       - name: Hazir videoyu indirilebilir yap
         if: always()
         uses: actions/upload-artifact@v4
