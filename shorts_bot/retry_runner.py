@@ -1,4 +1,4 @@
-"""Run the Shorts generator with retries limited to transient Gemini API requests.
+"""Run the Shorts generator with retries limited to Gemini API requests.
 
 Never retry the entire pipeline: doing so could upload duplicate YouTube videos.
 """
@@ -17,11 +17,11 @@ import main as bot
 
 _ORIGINAL_POST = requests.post
 _TRANSIENT_STATUS = {429, 500, 502, 503, 504}
+_MODEL_UNAVAILABLE_STATUS = {404}
 _MAX_ATTEMPTS = 5
 _DEFAULT_FALLBACK_MODELS = (
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
     "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
 )
 
@@ -78,8 +78,11 @@ def resilient_post(url: str, *args, **kwargs):
             try:
                 response = _ORIGINAL_POST(model_url, *args, **kwargs)
                 last_response = response
+                if response.status_code in _MODEL_UNAVAILABLE_STATUS:
+                    print(f"Gemini model {model or 'primary'} returned HTTP 404; trying another model.", flush=True)
+                    break
                 if response.status_code not in _TRANSIENT_STATUS:
-                    if model and model_index > 1:
+                    if response.ok and model and model_index > 1:
                         print(f"Gemini fallback succeeded with {model} (HTTP {response.status_code}).", flush=True)
                     return response
                 reason = f"HTTP {response.status_code}"
