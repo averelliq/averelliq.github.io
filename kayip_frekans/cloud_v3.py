@@ -51,8 +51,25 @@ def ask(prompt, structured=False):
     return json.loads(text) if structured else text
 
 
+def clean_generated_passage(text):
+    """Remove harmless model formatting before applying story quality gates."""
+    cleaned=[]
+    for raw in str(text).replace('\r\n','\n').split('\n'):
+        line=raw.strip()
+        if not line:
+            cleaned.append('')
+            continue
+        line=re.sub(r'^#{1,6}\s*','',line)
+        line=re.sub(r'^(?:\*\*|__)(.*?)(?:\*\*|__)$',r'\1',line)
+        line=re.sub(r'(?i)^bölüm\s*\d+\s*[:.\-–—]?\s*','',line).strip()
+        line=line.replace('**','').replace('__','')
+        if line:
+            cleaned.append(line)
+    return re.sub(r'\n{3,}','\n\n','\n'.join(cleaned)).strip()
+
+
 def check_passage(text, minimum, maximum):
-    text=normalize_for_speech(text.strip())
+    text=normalize_for_speech(clean_generated_passage(text))
     words=len(text.split())
     issues=[]
     if not minimum<=words<=maximum: issues.append(f'{words} kelime var; {minimum}-{maximum} kelime gerekli')
@@ -77,7 +94,7 @@ def write_passage(prompt, minimum, maximum):
         except (ValueError,KeyError) as exc:
             feedback=f'Önceki denemenin hatası: {exc}. Yukarıdaki konu için aşağıdaki taslağı verilen kelime aralığına KISALT veya geliştir. Başlık yazma. TASLAK: '+locals().get('text','')[:5000]
             print(f'Metin yeniden yazılıyor ({attempt+1}/3): {exc}',flush=True)
-    raise ValueError('Üç denemede yeterli hikâye üretilemedi; kısa video başarılı sayılmadı.')
+    raise ValueError('Üç denemede yeterli hikâye bölümü üretilemedi.')
 
 
 def create_story(topic, minutes, preview):
@@ -102,15 +119,22 @@ def create_story(topic, minutes, preview):
                 plan=candidate;break
         if plan is None: raise ValueError('Tutarlı bölüm planı üretilemedi.')
         save('plan.json',plan);title=clean_title(plan['title']);parts=[]
-        target=round(minutes*135/count)
+        # Long-form target intentionally allows a natural 15-20 minute result instead of
+        # rejecting a good chapter for being only a few dozen words over a narrow cap.
+        target=round(minutes*150/count)
+        passage_min=round(target*.78)
+        passage_max=round(target*1.30)
+        report['target_words_per_minute']=150
+        report['chapter_word_range']=[passage_min,passage_max]
         for i,beat in enumerate(plan['chapters']):
             prompt=(f'Plan: {json.dumps(plan,ensure_ascii=False)}\n'
               f'Önceki bölüm: {parts[-1] if parts else "Henüz yok; olayla başla."}\n'
               f'Şimdi {i+1}/{count}. bölüm: {beat}. '
               'Önceki bölümü yeniden anlatma. Sabit kişileri ve mekânı koru. '
-              'Yeni bilgi ve gerilim ekle; kanal açılışı ekleme. '
+              'Bu bölüm içinde en az iki ayrı merak noktası, ipucu veya gerilim yükselişi oluştur. '
+              'Yeni bilgi ve gerilim ekle; kanal açılışı ekleme. Başlık, markdown veya bölüm etiketi yazma. '
               +('Ana gizemi tutarlı şekilde sonuçlandır.' if i==count-1 else 'Final verme; sonraki olaya doğal bağlan.'))
-            parts.append(write_passage(prompt,round(target*.90),round(target*1.12)))
+            parts.append(write_passage(prompt,passage_min,passage_max))
             save('story_only.txt','\n\n'.join(parts))
             print(f'Hikâye {i+1}/{count}',flush=True)
     # A distinct editing call catches unnatural Turkish and causal discontinuities.
