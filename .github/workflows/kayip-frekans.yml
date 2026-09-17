@@ -49,7 +49,6 @@ jobs:
     timeout-minutes: 360
     env:
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-      SERKAN_REFERENCE_MP3_B64: ${{ secrets.SERKAN_REFERENCE_MP3_B64 }}
       STORY_TOPIC: ${{ inputs.topic }}
       TARGET_MINUTES: ${{ inputs.minutes || '5' }}
       SHORT_TEST: ${{ inputs.test }}
@@ -62,6 +61,8 @@ jobs:
         with:
           python-version: '3.11'
       - name: Ses referansi Secret kontrolu (referans asla yazdirilmaz)
+        env:
+          SERKAN_REFERENCE_MP3_B64: ${{ secrets.SERKAN_REFERENCE_MP3_B64 }}
         run: |
           if [ -z "$SERKAN_REFERENCE_MP3_B64" ]; then
             echo 'SERKAN_REFERENCE_MP3_B64 Secret eksik. Klon disinda ses kullanilmadi.' >&2
@@ -74,7 +75,6 @@ jobs:
           pip install -r kayip_frekans/requirements.txt
           pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
           pip install chatterbox-tts==0.1.7
-          python -c 'import sys; sys.path.insert(0,"kayip_frekans"); import clone_voice; folder,reference=clone_voice.require_reference(); folder.cleanup(); print("Private voice reference validated")'
           curl --fail --location --retry 3 https://ollama.com/install.sh -o /tmp/install-ollama.sh
           sh /tmp/install-ollama.sh
           ollama serve >/tmp/ollama.log 2>&1 &
@@ -93,6 +93,8 @@ jobs:
           fi
       - name: ElevenLabs kredisi kullanmadan Serkan referansiyla Turkce seslendir
         timeout-minutes: 160
+        env:
+          SERKAN_REFERENCE_MP3_B64: ${{ secrets.SERKAN_REFERENCE_MP3_B64 }}
         run: python -u kayip_frekans/cloud_v14.py --stage narration
       - name: Logolu 1080p montaj (altyazi zamanlamasi tahminidir)
         timeout-minutes: 75
