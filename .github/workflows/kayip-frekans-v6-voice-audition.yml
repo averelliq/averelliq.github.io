@@ -1,0 +1,48 @@
+name: KAYIP FREKANS - V6 Serkan Ses Denemesi
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/kayip-frekans-v6-voice-audition.yml
+permissions:
+  contents: read
+concurrency:
+  group: kf-v6-voice-audition
+  cancel-in-progress: true
+jobs:
+  voice-preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    env:
+      # Optional PRIVATE secret: base64 of the ORIGINAL complete 44.5s MP3.
+      # Without it the existing repository's ~10s excerpt is used and the
+      # report explicitly says this cannot certify the full reference.
+      KF_FULL_REFERENCE_B64: ${{ secrets.KF_FULL_REFERENCE_B64 }}
+      HF_HUB_DISABLE_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: FFmpeg ve ucretsiz CPU modelini kur
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0 torchaudio==2.6.0
+          pip install chatterbox-tts==0.1.7 soundfile
+      - name: Dogrudan referansla uc Turkce ses denemesi
+        timeout-minutes: 75
+        run: |
+          python -u kayip_frekans/voice_preview_v6.py --output output/voice-audition
+      - name: Yalnizca dinleme ve karsilastirma icin ses paketini yukle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KAYIP-FREKANS-V6-REFERANS-SES-TESTI
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: warn
+          path: |
+            output/voice-audition/serkan-v6-*.wav
+            output/voice-audition/voice_audition_v6.json
