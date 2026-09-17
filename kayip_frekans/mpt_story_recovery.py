@@ -1,7 +1,7 @@
-"""Recover long Turkish horror stories without accepting truncated or weak drafts.
+"""Bounded recovery for original Turkish long-form horror stories.
 
-A bad chapter is rewritten; a broken plan or failed editorial review restarts the
-story from a fresh outline. Every retry is bounded to avoid endless Actions jobs.
+The model often returns fewer beats than requested. Accept its useful outline
+instead of rerunning the identical oversized JSON request twelve times.
 """
 from __future__ import annotations
 
@@ -14,46 +14,110 @@ from quality import clean_title, intro_text
 
 
 class StoryExhausted(RuntimeError):
-    """No complete high-quality story could be produced within the retry budget."""
+    """No complete, checked story could be produced within bounded retries."""
 
 
 def _save(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        data if isinstance(data, str) else json.dumps(data, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    path.write_text(data if isinstance(data, str) else json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+# These are distinct narrative tasks, not filler text to insert in the story.
+# The generator must still invent the actual events, and editorial gates remain.
+_STAGES = (
+    "Somut olayı anlat; görülen veya duyulan ayrıntıyı netleştir, önceki bilgiyi tekrarlama.",
+    "Anlatıcının ve tanığın gerçekçi tepkisini, araştırmasını ve somut sonucunu anlat.",
+    "Yeni kanıtın veya davranışın sonraki olaya nasıl yol açtığını anlat; açık bir merak noktası bırak.",
+)
+_FALLBACK_ARC = (
+    "Konunun içindeki en ürpertici somut olaydan açılış ve bunun hemen öncesi",
+    "Normal hayat, ana mekân, aile ilişkisi ve ilk doğrulanabilir anormallik",
+    "Eski eşya veya tanık üzerinden ilk ipucu ve eksik kalan açıklama",
+    "Önceden ekilmiş ipuçlarını karşılayan yüzleşme, sonuç ve sonrası",
+)
+
+
+def _expand_beats(beats: list[str], count: int) -> list[str]:
+    """Spread 2+ model-authored turning points across distinct scene tasks.
+
+    An incomplete outline is not mistaken for a complete story: only the
+    *plan* is expanded here, and every generated chapter is checked later.
+    """
+    if len(beats) == count:
+        return beats
+    result = []
+    for index in range(count):
+        anchor_index = min(len(beats) - 1, index * len(beats) // count)
+        anchor = beats[anchor_index]
+        group_start = (anchor_index * count + len(beats) - 1) // len(beats)
+        group_end = min(count, ((anchor_index + 1) * count + len(beats) - 1) // len(beats))
+        position = index - group_start
+        stage = _STAGES[min(2, position * len(_STAGES) // max(1, group_end - group_start))]
+        if index == count - 1:
+            stage = "Önceden gösterilmiş ipuçlarını karşılayan finali ve sonrasını tamamla."
+        result.append(f"Ana olay {anchor_index + 1}: {anchor}. Bu sahnenin AYRI görevi: {stage}")
+    return result
 
 
 def _outline(topic: str, count: int, ask, feedback: str) -> dict:
-    for attempt in range(1, 4):
+    """Request a short four-turn outline, then deterministically expand beats.
+
+    The old request demanded exactly twelve elaborate JSON items from a 4B CPU
+    model, which repeatedly produced fewer items even after twelve retries.
+    """
+    errors = []
+    for attempt in range(1, 3):
         prompt = (
-            f"Konu: {topic[:450]}. Birinci tekil şahısla, {count} bölümlü özgün cinli korku "
-            "hikâyesi için olay planı hazırla. Karakterler, tek ana mekân, zaman, "
-            "cin ile ilgili kurallar ve önceden ekilip finalde açıklanacak ipuçları tutarlı olsun. "
-            "Cin görünmesi, kapının çarpması, çığlık ve musallat gerektiğinde serbesttir; "
-            "nedensiz tekrar kullanma. Tam JSON şeması: "
-            '{"title":"başlık","characters":"kişiler","setting":"mekân ve zaman",'
-            '"rules":"doğaüstü kurallar","clues":"ipuçları ve çözümü",'
-            '"chapters":["her bölüm için somut olay ve sonuç"]}. '
-            f"chapters dizisi TAM {count} öğe içersin. İlk bölüm olayla açılsın. "
-            "Final daha önce ekilmiş ipuçlarıyla çözülsün. "
-            f"Önceki sorunlardan ders al: {feedback[:1000]}"
+            f"Konu: {topic[:450]}. ÖZGÜN, birinci tekil anlatılan Türkçe cinli korku "
+            "hikâyesinin yalnızca DÖRT ana dönüm noktasını planla. "
+            "Birinci olay somut korkuyla açılır; son olay önceden ekilen ipuçlarını açıklar. "
+            "Gündelik hayat ve kişi/eşya/zaman tutarlılığı korunsun. Cin, kapı çarpması, "
+            "çığlık gerekiyorsa serbest. Kısa JSON yaz, bölüm metni yazma. Tam JSON şeması: "
+            '{"title":"başlık","characters":"sabit kişiler","setting":"ana mekân ve zaman",'
+            '"rules":"doğaüstü kurallar","clues":"önceden ekilen ipuçları ve çözümü",'
+            '"chapters":["somut açılış","ilk kanıt","olayların ağırlaşması","ipuçlarının karşılandığı final"]}. '
+            f"Kısa, anlaşılır dört olay yeterlidir; sistem bunları {count} sahneye bölecek. "
+            f"Önceki sorun: {feedback[:260]}"
         )
         try:
             plan = ask(prompt, structured=True)
             if not isinstance(plan, dict):
-                raise ValueError("Olay planı JSON nesnesi değil")
-            beats = plan.get("chapters")
-            if not isinstance(beats, list) or len(beats) != count or not all(
-                isinstance(beat, str) and len(beat.strip()) >= 12 for beat in beats
-            ):
-                raise ValueError(f"Olay planında {count} dolu bölüm yok")
+                raise ValueError("Olay planı bir JSON nesnesi değil")
+            raw = plan.get("chapters", plan.get("turning_points", []))
+            if not isinstance(raw, list):
+                raise ValueError("Olay planının chapters alanı liste değil")
+            beats = [beat.strip() for beat in raw if isinstance(beat, str) and len(beat.strip()) >= 8]
+            if len(beats) < 2:
+                raise ValueError("En az iki somut dönüm noktası yok")
+            # A few meaningful beats can drive twelve different CHAPTER PROMPTS;
+            # never pad the actual narration with duplicate sentences.
+            plan["chapters"] = _expand_beats(beats, count)
+            plan["outline_source_beats"] = len(beats)
+            plan["outline_mode"] = "model_beats_expanded" if len(beats) != count else "model_exact"
+            plan.setdefault("title", "Kapının Öteki Tarafındaki Ses")
+            for key, default in (("characters", "Anlatıcı ve konudaki tanıklar; ilişkiler sabit"),
+                                 ("setting", topic[:300]),
+                                 ("rules", "Doğaüstü olayların işleyişi baştan sona aynı kalır"),
+                                 ("clues", "İpuçları önce gösterilir, finalde anlam kazanır")):
+                if not isinstance(plan.get(key), str) or not plan[key].strip():
+                    plan[key] = default
+            print(f"Olay planı onarıldı: {len(beats)} özgün dönüm noktası -> {count} ayrı sahne görevi.", flush=True)
             return plan
         except (ValueError, KeyError, TypeError, RuntimeError) as exc:
-            print(f"Olay planı yeniden yazılıyor ({attempt}/3): {exc}", flush=True)
-            feedback = str(exc)
-    raise StoryExhausted("Üç denemede tutarlı olay planı üretilemedi")
+            errors.append(f"{type(exc).__name__}: {str(exc)[:140]}")
+            print(f"Kısa olay planı yeniden isteniyor ({attempt}/2): {errors[-1]}", flush=True)
+    # This creates only scene instructions, never a fabricated finished story.
+    # Narration still needs real model-generated chapters and full quality checks.
+    fallback = {
+        "title": "Kapının Öteki Tarafındaki Ses", "characters": "Anlatıcı ve konudaki kişiler; ilişkiler sabit",
+        "setting": topic[:300], "rules": "Doğaüstü olayların kuralları değişmez",
+        "clues": "Somut nesne ve tanık önce gösterilir, finalde olayla ilişkilendirilir",
+        "outline_mode": "topic_grounded_scaffold", "outline_errors": errors,
+        "outline_source_beats": len(_FALLBACK_ARC),
+        "chapters": _expand_beats(list(_FALLBACK_ARC), count),
+    }
+    print("Model kısa planı da üretemedi; konuya dayanan özgün hikâye İSKELETİ kullanılıyor (kalite kontrolleri açık).", flush=True)
+    return fallback
 
 
 def _passage(prompt: str, minimum: int, maximum: int, ask, output: Path) -> str:
@@ -77,11 +141,7 @@ def _passage(prompt: str, minimum: int, maximum: int, ask, output: Path) -> str:
 
 def generate_story(topic: str, minutes: int, ask, output: Path,
                    research_context: str = "", max_story_attempts: int = 3) -> tuple:
-    """Return (title, [intro, *chapters], report), or save and report failure.
-
-    Never pads with repeated paragraphs, bypasses quality gates, or copies source
-    text; a genuinely unrecoverable failure remains visible for human review.
-    """
+    """Return checked story; never accept fake length, repeated filler or copied text."""
     if not 15 <= minutes <= 20:
         raise ValueError("Long story must be 15-20 minutes")
     count = max(10, round(minutes / 1.25))
@@ -131,13 +191,14 @@ def generate_story(topic: str, minutes: int, ask, output: Path,
             if not isinstance(review, dict) or review.get("pass") is not True or review.get("issues"):
                 raise ValueError("Editör somut tutarsızlık buldu: " + str(review)[:600])
             report = {
-                "version": "recovery-1", "story_attempt": story_attempt,
+                "version": "recovery-2", "story_attempt": story_attempt,
+                "outline_mode": plan.get("outline_mode"),
+                "outline_source_beats": plan.get("outline_source_beats"),
                 "chapter_count": count, "chapter_word_range": [minimum, maximum],
                 "story_words": len(story.split()), "target_minutes": minutes,
                 "target_words_per_minute": 150, "editor_review": review,
                 "rejected_attempts": failures, "human_review_required": True,
-                "recovery_limit": max_story_attempts,
-                "source_text_copied": False,
+                "recovery_limit": max_story_attempts, "source_text_copied": False,
             }
             _save(draft / "quality_report.json", report)
             return title, [intro_text(title)] + parts, report
