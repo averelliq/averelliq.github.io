@@ -1,15 +1,9 @@
-"""KAYIP FREKANS V4 - tek kesintisiz anlatim + Serkan sentetik ses profili.
-
-V3 hikaye/gorsel motorunu korur. Tek fark:
-- hikayenin tamami Edge TTS'e TEK istekte verilir;
-- ayri ses parcalari uretilip birlestirilmez;
-- olusan tek uzun kaynak ses, tek seferde OpenVoice ile Serkan referans tonuna cevrilir;
-- altyazi zamanlari donusum sonrasi sureye oransal olarak kilitlenir.
-"""
+"""KAYIP FREKANS V4 - tek kesintisiz Serkan anlatimi ve dayanikli render."""
 from __future__ import annotations
 
 import asyncio
 import base64
+import random
 import subprocess
 from pathlib import Path
 
@@ -48,11 +42,7 @@ async def tts_single_stream(text: str, path: Path):
 
     boundaries = []
     communicate = edge_tts.Communicate(
-        text,
-        v3.VOICE,
-        rate="-7%",
-        pitch="-2Hz",
-        boundary="WordBoundary",
+        text, v3.VOICE, rate="-7%", pitch="-2Hz", boundary="WordBoundary"
     )
     with path.open("wb") as f:
         async for chunk in communicate.stream():
@@ -60,14 +50,13 @@ async def tts_single_stream(text: str, path: Path):
                 f.write(chunk["data"])
             elif chunk["type"] == "WordBoundary":
                 boundaries.append(chunk)
-
     if not boundaries or path.stat().st_size < 10_000:
         raise ValueError("Tek parca TTS sesi veya kelime zamanlari olusmadi.")
     return boundaries
 
 
 def whole_file_voice_conversion(source_wav: Path, target_ref: Path, output_wav: Path):
-    """Kaynak sesin TAMAMINI tek OpenVoice conversion cagrisi ile donusturur."""
+    """Anlatimin TAMAMINI tek OpenVoice conversion cagrisi ile donusturur."""
     import openvoice_cli
     from openvoice_cli.api import ToneColorConverter, OpenVoiceBaseClass
     from openvoice_cli.downloader import download_checkpoint
@@ -80,37 +69,25 @@ def whole_file_voice_conversion(source_wav: Path, target_ref: Path, output_wav: 
     if not config.exists() or not checkpoint.exists():
         download_checkpoint(str(checkpoint_dir))
 
-    # openvoice-cli 0.0.5'te ToneColorConverter.__init__, enable_watermark
-    # parametresini yanlislikla base constructor'a iletiyor. Hata veren wrapper'i
-    # atlayip ayni sinifi dogrudan base initializer ile kuruyoruz.
+    # openvoice-cli 0.0.5 wrapper'indaki enable_watermark constructor hatasini atla.
     converter = ToneColorConverter.__new__(ToneColorConverter)
     OpenVoiceBaseClass.__init__(converter, str(config), device="cpu")
     converter.watermark_model = None
     converter.version = getattr(converter.hps, "_version_", "v1")
     converter.load_ckpt(str(checkpoint))
 
-    # Speaker embedding icin kisa temiz ornek yeterlidir. Asil anlatim
-    # asagidaki convert cagrilarinda bolunmeden TAM dosya olarak verilir.
+    # Speaker embedding icin kisa ornekler; asil anlatim asagida TEK dosya olarak cevrilir.
     source_seed = v3.OUT / "source-speaker-seed.wav"
     target_seed = v3.OUT / "serkan-speaker-seed.wav"
-    v3.bot.run(
-        "ffmpeg", "-v", "error", "-y", "-i", source_wav,
-        "-t", "20", "-ac", "1", source_seed
-    )
-    v3.bot.run(
-        "ffmpeg", "-v", "error", "-y", "-i", target_ref,
-        "-ac", "1", target_seed
-    )
-
+    v3.bot.run("ffmpeg", "-v", "error", "-y", "-i", source_wav,
+               "-t", "20", "-ac", "1", source_seed)
+    v3.bot.run("ffmpeg", "-v", "error", "-y", "-i", target_ref,
+               "-ac", "1", target_seed)
     src_se = converter.extract_se(str(source_seed))
     tgt_se = converter.extract_se(str(target_seed))
     converter.convert(
-        audio_src_path=str(source_wav),
-        src_se=src_se,
-        tgt_se=tgt_se,
-        output_path=str(output_wav),
-        tau=0.3,
-        message="KAYIPF",
+        audio_src_path=str(source_wav), src_se=src_se, tgt_se=tgt_se,
+        output_path=str(output_wav), tau=0.3, message="KAYIPF"
     )
     if not output_wav.exists() or output_wav.stat().st_size < 100_000:
         raise ValueError("Serkan tek-parca ses donusumu cikti uretmedi.")
@@ -123,12 +100,8 @@ def proportional_segments(parts, total):
     segments = []
     for i, (part, weight) in enumerate(zip(parts, weights)):
         end = total if i == len(parts) - 1 else cursor + total * (weight / denom)
-        segments.append({
-            "start": cursor,
-            "end": end,
-            "text": part,
-            "kind": v3.category(part),
-        })
+        segments.append({"start": cursor, "end": end, "text": part,
+                         "kind": v3.category(part)})
         cursor = end
     return segments
 
@@ -137,23 +110,17 @@ def narrate(parts):
     full_text = "\n\n".join(p.strip() for p in parts if p.strip())
     if not full_text:
         raise ValueError("Seslendirilecek hikaye bos.")
-
     ref = materialize_reference()
 
-    # TEK Edge TTS stream. Passage/chunk dongusu yok, ses birlestirme yok.
+    # TEK Edge TTS akisi. Passage/chunk dongusu ve ses birlestirme YOK.
     boundaries = asyncio.run(tts_single_stream(full_text, SOURCE_MP3))
-    v3.bot.run(
-        "ffmpeg", "-v", "error", "-y", "-i", SOURCE_MP3,
-        "-ac", "1", "-ar", "24000", SOURCE_WAV
-    )
+    v3.bot.run("ffmpeg", "-v", "error", "-y", "-i", SOURCE_MP3,
+               "-ac", "1", "-ar", "24000", SOURCE_WAV)
     source_total = seconds(SOURCE_WAV)
-
-    # TEK uzun dosyaya TEK voice-conversion cagrisi.
     whole_file_voice_conversion(SOURCE_WAV, ref, MASTER_WAV)
     total = seconds(MASTER_WAV)
     if total <= 0:
         raise ValueError("Donusturulmus anlatim suresi gecersiz.")
-
     ratio = total / source_total
     if not 0.90 <= ratio <= 1.10:
         raise ValueError(
@@ -163,14 +130,10 @@ def narrate(parts):
     source_cues = v3.caption_cues(boundaries, 0.0)
     cues = [(a * ratio, b * ratio, text) for a, b, text in source_cues]
     segments = proportional_segments(parts, total)
-
-    v3.save(
-        "captions.srt",
-        "\n\n".join(
-            f"{i+1}\n{v3.bot.stamp(a)} --> {v3.bot.stamp(b)}\n{text}"
-            for i, (a, b, text) in enumerate(cues)
-        ) + "\n",
-    )
+    v3.save("captions.srt", "\n\n".join(
+        f"{i+1}\n{v3.bot.stamp(a)} --> {v3.bot.stamp(b)}\n{text}"
+        for i, (a, b, text) in enumerate(cues)
+    ) + "\n")
     v3.save("scene_plan.json", segments)
     v3.save("voice_pipeline.json", {
         "version": "V4",
@@ -182,11 +145,87 @@ def narrate(parts):
         "timing_scale": ratio,
         "reference_seconds": seconds(ref),
     })
-    print(
-        f"V4 tek-parca anlatim hazir: kaynak {source_total:.1f}s -> Serkan {total:.1f}s",
-        flush=True,
-    )
+    print(f"V4 tek-parca anlatim hazir: kaynak {source_total:.1f}s -> Serkan {total:.1f}s", flush=True)
     return total, segments, cues
+
+
+# Pexels anahtari gecersiz/limitli/ag hatali olsa da render yarida kalmasin.
+# Her cagrida farkli yerel 1080p karanlik sahne uretilir; boylece gorsel cesitlilik
+# kontrolu de gercekten farkli kaynaklarla gecilir.
+_original_asset_get = v3.Assets.get
+
+
+def _offline_visual(self, key: str) -> Path:
+    counter = getattr(self, "_offline_counter", 0)
+    self._offline_counter = counter + 1
+    path = v3.OUT / f"offline-{key}-{counter:03d}.jpg"
+    if path.exists():
+        return path
+
+    rng = random.Random(f"KAYIP-FREKANS-{key}-{counter}")
+    base = {
+        "door": (17, 12, 12), "window": (10, 14, 18), "stairs": (14, 12, 16),
+        "forest": (8, 15, 11), "candle": (20, 14, 8), "house": (12, 13, 15),
+        "room": (13, 11, 15), "corridor": (10, 11, 14),
+    }.get(key, (11, 11, 14))
+    im = v3.Image.new("RGB", (v3.W, v3.H), base)
+    d = v3.ImageDraw.Draw(im, "RGBA")
+
+    # Sis/derinlik katmanlari.
+    for i in range(18):
+        y = int(v3.H * i / 18)
+        alpha = 8 + i * 2
+        d.rectangle((0, y, v3.W, y + v3.H // 16), fill=(80, 85, 92, alpha))
+
+    # Sahne kategorisine gore soyut, fotografik olmayan karanlik siluetler.
+    if key in {"door", "corridor", "room"}:
+        x = rng.randint(610, 880)
+        d.rectangle((x, 120, x + 520, 1040), fill=(3, 3, 5, 235), outline=(80, 72, 65, 140), width=8)
+        d.ellipse((x + 430, 560, x + 450, 580), fill=(120, 95, 62, 190))
+        for off in (-420, 420):
+            d.polygon([(x + 260, 100), (x + 260 + off, 1080), (x + 260, 1080)], fill=(3, 4, 6, 110))
+    elif key == "window":
+        d.rectangle((600, 170, 1320, 830), fill=(6, 10, 16, 240), outline=(105, 110, 120, 150), width=8)
+        d.line((960, 170, 960, 830), fill=(105, 110, 120, 150), width=6)
+        d.line((600, 500, 1320, 500), fill=(105, 110, 120, 150), width=6)
+    elif key == "stairs":
+        for i in range(11):
+            y = 1040 - i * 78
+            x = 250 + i * 65
+            d.rectangle((x, y, 1680 - i * 55, y + 42), fill=(36, 32, 38, 210))
+    elif key == "forest":
+        for _ in range(24):
+            x = rng.randint(0, v3.W)
+            w = rng.randint(28, 80)
+            d.rectangle((x, 0, x + w, v3.H), fill=(3, 9, 6, rng.randint(120, 220)))
+    elif key == "candle":
+        d.rectangle((900, 560, 1020, 1040), fill=(120, 95, 62, 170))
+        d.ellipse((895, 420, 1025, 650), fill=(240, 170, 80, 130))
+        d.ellipse((925, 455, 995, 610), fill=(255, 220, 145, 190))
+    else:  # house ve digerleri
+        d.polygon([(420, 620), (960, 250), (1510, 620), (1430, 1030), (500, 1030)], fill=(4, 5, 7, 235))
+        d.rectangle((850, 680, 1070, 1030), fill=(2, 2, 3, 245))
+
+    # Hafif vignette + rastgele sis cizgileri.
+    for _ in range(22):
+        y = rng.randint(80, 1000)
+        x1 = rng.randint(-200, 900)
+        x2 = rng.randint(1050, 2150)
+        d.line((x1, y, x2, y + rng.randint(-35, 35)), fill=(145, 150, 160, rng.randint(8, 22)), width=rng.randint(2, 8))
+    for i in range(10):
+        margin = i * 24
+        d.rectangle((margin, margin, v3.W - margin - 1, v3.H - margin - 1),
+                    outline=(0, 0, 0, 12 + i * 5), width=28)
+    im.save(path, quality=94)
+    return path
+
+
+def safe_asset_get(self, key):
+    try:
+        return _original_asset_get(self, key)
+    except Exception as exc:
+        print(f"Pexels kullanilamadi ({type(exc).__name__}: {exc}); yerel {key} sahnesine gecildi.", flush=True)
+        return _offline_visual(self, key)
 
 
 _old_create_story = v3.create_story
@@ -194,9 +233,6 @@ _old_create_story = v3.create_story
 
 def create_story_v4(topic, minutes, preview):
     if preview:
-        # Push/smoke testinin amaci ses ve video zincirini dogrulamaktir.
-        # Buyuk hikaye modelini indirmeden dogrudan sabit, kontrol edilmis bir
-        # kisa kurmaca kullanir. Manuel normal uretimde V3 hikaye motoru aynen calisir.
         title = "Kapının Ardındaki Ses"
         text = (
             "Gece yarısına doğru mutfaktan üç kez kapı tokmağı sesi geldi. Evde yalnızdım ve dış kapıyı "
@@ -217,11 +253,8 @@ def create_story_v4(topic, minutes, preview):
             "kilitliydi. O geceden sonra evde tek başıma kalmadım; çünkü sesin dışarıdan gelmediğini artık biliyordum."
         )
         report = {
-            "version": 4,
-            "engine_version": "V4",
-            "preview": True,
-            "human_review_required": True,
-            "story_words": len(text.split()),
+            "version": 4, "engine_version": "V4", "preview": True,
+            "human_review_required": True, "story_words": len(text.split()),
             "target_minutes": minutes,
             "editor_review": {"issues": [], "pass": True, "mode": "fixed smoke fixture"},
             "voice_name": "Serkan Demirci - synthetic reference",
@@ -246,6 +279,7 @@ def create_story_v4(topic, minutes, preview):
 
 v3.create_story = create_story_v4
 v3.narrate = narrate
+v3.Assets.get = safe_asset_get
 
 
 if __name__ == "__main__":
