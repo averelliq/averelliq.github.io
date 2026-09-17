@@ -1,4 +1,4 @@
-name: KAYIP FREKANS - Ucretsiz Video Botu
+name: KAYIP FREKANS - Kalite ve Kontrollu Video
 on:
   workflow_dispatch:
     inputs:
@@ -7,11 +7,15 @@ on:
         default: Köy evinin kapısından ölmüş kardeşimin sesini duydum
         type: string
       minutes:
-        description: Hedef dakika (5-35; gerçek süre seslendirmeye bağlı)
-        default: '30'
+        description: Hedef dakika (5-35)
+        default: '20'
         type: string
       test:
-        description: Sadece kısa üretim testi
+        description: Kisa teknik test
+        default: true
+        type: boolean
+      legacy_voice_approved:
+        description: Yalnizca ESKI Ahmet+OpenVoice sesini bilerek kabul ettiyseniz isaretleyin; V6 Serkan klonu DEGIL
         default: false
         type: boolean
   push:
@@ -30,7 +34,7 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -38,21 +42,24 @@ jobs:
           python-version: '3.11'
       - name: Test bagimliliklari
         run: pip install Pillow==11.3.0 numpy==1.26.4
-      - name: Turkce giris ve kalite testleri
+      - name: Turkce metin, ses ve gorsel testleri
         run: python -m unittest discover -s kayip_frekans -p 'test_*.py' -v
       - name: Python sozdizimi
-        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/cloud_v4.py kayip_frekans/cloud_v5.py kayip_frekans/audio_quality_v5.py kayip_frekans/visual_balance_v5.py kayip_frekans/quality.py
+        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/cloud_v4.py kayip_frekans/cloud_v5.py kayip_frekans/audio_quality_v5.py kayip_frekans/visual_balance_v5.py kayip_frekans/voice_preview_v6.py kayip_frekans/quality.py
   video:
-    if: github.event.repository.private == false && github.event_name != 'pull_request'
+    # STOP: the existing V5 pipeline uses Ahmet + OpenVoice, not the approved
+    # voice. Pushes/PRs only test code; no automatic video or public upload.
+    if: github.event_name == 'workflow_dispatch' && inputs.legacy_voice_approved == true && github.event.repository.private == false
     needs: quality
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       STORY_TOPIC: ${{ inputs.topic }}
-      TARGET_MINUTES: ${{ inputs.minutes || '30' }}
-      SHORT_TEST: ${{ github.event_name != 'workflow_dispatch' || inputs.test }}
+      TARGET_MINUTES: ${{ inputs.minutes || '20' }}
+      SHORT_TEST: ${{ inputs.test }}
       OLLAMA_HOST: 127.0.0.1:11434
+      KF_ALLOW_ABSTRACT_VISUALS: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -75,28 +82,26 @@ jobs:
               sleep 2
             done
             ollama pull gemma3:4b
-          else
-            echo "Smoke test: Ollama/Gemma indirmesi atlandi."
           fi
       - name: Hikaye yaz ve editor kontrolunden gecir
-        timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.test != true && 120 || 15 }}
+        timeout-minutes: 120
         run: |
           if [ "$SHORT_TEST" = "true" ]; then
             python -u kayip_frekans/cloud_v5.py --stage story --smoke
           else
             python -u kayip_frekans/cloud_v5.py --stage story
           fi
-      - name: Tek akista ses, kontrollu duraklama ve altyazi
+      - name: Eski ses ve altyazi - YALNIZCA MANUEL ONAYLA
         timeout-minutes: 90
         run: python -u kayip_frekans/cloud_v5.py --stage narration
-      - name: Baglama uygun sahneler ve 1080p video
+      - name: Gercek fotograflarla video - Pexels hatasinda DUR
         timeout-minutes: 45
         run: python -u kayip_frekans/cloud_v5.py --stage render
-      - name: Videoyu ve ses kalitesi raporunu kaydet
+      - name: Videoyu inceleme icin kaydet; YouTube'a yukleme YOK
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: KAYIP-FREKANS-${{ github.run_number }}
+          name: KAYIP-FREKANS-LEGACY-${{ github.run_number }}
           retention-days: 7
           compression-level: 0
           if-no-files-found: warn
@@ -104,8 +109,6 @@ jobs:
             output/final.mp4
             output/thumbnail.jpg
             output/story.txt
-            output/story_only.txt
-            output/intro.txt
             output/captions.srt
             output/metadata.json
             output/validation.json
@@ -117,6 +120,4 @@ jobs:
             output/shots.json
             output/visual_sources.json
             output/credits.txt
-            output/plan.json
             output/state.json
-            output/draft-*.txt
