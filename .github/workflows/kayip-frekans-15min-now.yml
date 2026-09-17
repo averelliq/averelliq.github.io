@@ -1,0 +1,72 @@
+name: KAYIP FREKANS - 15 Dakika Simdi
+on:
+  push:
+    paths:
+      - .github/workflows/kayip-frekans-15min-now.yml
+permissions:
+  contents: read
+jobs:
+  full-video:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      STORY_TOPIC: Köy evinde ölmüş kardeşimin sesi gece kapının ardından geldi
+      TARGET_MINUTES: '15'
+      SHORT_TEST: 'false'
+      OLLAMA_HOST: 127.0.0.1:11434
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Araclari kur
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.1
+          pip install -r kayip_frekans/requirements.txt
+          pip install --no-deps openvoice-cli==0.0.5
+          curl --fail --location --retry 3 https://ollama.com/install.sh -o /tmp/install-ollama.sh
+          sh /tmp/install-ollama.sh
+          ollama serve >/tmp/ollama.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
+            sleep 2
+          done
+          ollama pull gemma3:4b
+      - name: 15 dakikalik hikaye yaz
+        timeout-minutes: 90
+        run: python -u kayip_frekans/cloud_v4.py --stage story
+      - name: Tek parca Serkan anlatimi
+        timeout-minutes: 90
+        run: python -u kayip_frekans/cloud_v4.py --stage narration
+      - name: 1080p videoyu render et
+        timeout-minutes: 60
+        run: python -u kayip_frekans/cloud_v4.py --stage render
+      - name: Ciktilari yukle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KAYIP-FREKANS-15MIN
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: warn
+          path: |
+            output/final.mp4
+            output/thumbnail.jpg
+            output/story.txt
+            output/story_only.txt
+            output/intro.txt
+            output/captions.srt
+            output/metadata.json
+            output/validation.json
+            output/quality_report.json
+            output/voice_pipeline.json
+            output/narration.wav
+            output/scene_plan.json
+            output/shots.json
+            output/visual_sources.json
+            output/credits.txt
+            output/state.json
