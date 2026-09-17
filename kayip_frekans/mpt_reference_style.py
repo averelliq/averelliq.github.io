@@ -1,10 +1,7 @@
-"""Reference-video-derived style rules for KAYIP FREKANS_.
+"""KAYIP FREKANS_ story style and optional sourced folklore research.
 
-These rules are intentionally about structure, pacing and visual language, not
-copying another creator's wording or stories. Optional web research gathers short
-factual/folklore notes from public Wikimedia sources and records provenance; the
-final script must remain original fiction unless a supplied source is genuinely
-public-domain and explicitly marked as such.
+Research supplies short factual context and story motifs, never unlicensed story
+text. Supernatural events are welcome when motivated by the plot.
 """
 from __future__ import annotations
 
@@ -16,36 +13,28 @@ import urllib.request
 
 STYLE_BRIEF = """
 ANLATIM TARZI:
-- Yaşanmış olay anlatısı hissi ver: sakin, ciddi, ölçülü bir tanıklık tonu kullan. Her cümlede bağıran korku sıfatları kullanma.
-- Önce normal hayatı somutlaştır: iş/okul, aile ilişkisi, mahalle/köy, oda, çekmece, kapı, telefon, komşu, ulaşım gibi gündelik ayrıntılar ver.
-- Korku olaydan doğsun. 'İçimi tarif edemediğim korku kapladı', 'kanım dondu', 'gözlerime inanamadım' gibi klişeleri tekrar etme.
-- Olay zinciri neden-sonuçlu ilerlesin: sıradan durum -> ilk anormallik -> doğrulanabilir somut ipucu/nesne -> yanlış veya geçici açıklama -> daha ağır sonuç -> yeni bilgi -> final açıklaması/bedeli -> kısa aftermath.
-- Her büyük olay, bir önceki olayın sonucundan doğsun. Tesadüfi canavar/cin/kapı/çığlık ekleme.
-- İsim, ilişki, mekan, eşya ve zaman çizgisi değişmesin. Bir nesne önemliyse önce göster, sonra geri getir.
-- Diyaloglar kısa ve doğal olsun. İnsanlar bilgi aktarmak için yapay monologlar kurmasın.
-- Birinci tekil kişi ana anlatıcı olsun. Anlatıcı her şeyi bilen biri gibi davranmasın; bildiği şeyi nereden öğrendiği belli olsun.
-- İlk 20 saniye somut bir tehlike veya sonuçla açılabilir; ardından olayın başına dön. Kanal selamlaması hook'tan sonra gelir.
-- Her 45-90 saniyede yeni bir soru, somut bulgu, davranış değişikliği, tanık, nesne, zarar veya açıklama gelsin.
-- Final yalnızca 'meğer cinmiş' olmasın. Önceden ekilen ipuçlarını açıklasın ve karakterlerin hayatında kalıcı bir sonuç bıraksın.
-- Gerçek kişi/gerçek suç kullanılıyorsa kurmaca korku unsurlarını onlara atfetme. Gerçek dünya araştırması yalnızca yer, folklor, dönem ve atmosfer ayrıntısı için kullanılsın.
+- Yaşanmış olay hissi ver: sakin, ciddi, ölçülü bir tanıklık tonu kullan; korkuyu olay ve karakter tepkileri taşısın.
+- Normal hayatı somutlaştır: aile, köy, iş, oda, çekmece, komşu ve gündelik davranışlar.
+- Olay zinciri neden-sonuçlu ilerlesin: sıradan durum -> anormallik -> somut ipucu -> geçici açıklama -> ağır sonuç -> yeni bilgi -> ipuçlarına dayalı final -> kısa aftermath.
+- Cin görünmesi, kapı çarpması, çığlık, musallat ve doğaüstü karşılaşmalar SERBESTTİR; bunları yasaklama veya metinden otomatik silme. Gerektiğinde korkunun merkezinde olsunlar. Tek koşul: sahnenin sebebi, karakterin tepkisi ve hikâyeye sonucu anlaşılır olsun; aynı etkiyi sebepsiz yere tekrar etme.
+- Klişe sözleri yalnızca art arda/otomatik tekrarlandığında azalt; sırf bir korku olayı veya çığlık var diye kaliteyi düşürme.
+- İsim, ilişki, mekân, eşya ve zaman çizgisi değişmesin. Önemli nesneyi önce göster, finalde anlamlandır.
+- Diyaloglar kısa ve doğal olsun. Anlatıcı yalnız bildiği şeyleri veya nereden öğrendiğini anlatsın.
+- İlk 20 saniyede somut bir tehlike veya sonuçla açıl; sonra gerekiyorsa olayın başına dön. Kanal selamlaması hook'tan sonra gelir.
+- Her 45-90 saniyede yeni soru, bulgu, davranış değişikliği, tanık, nesne veya yükseliş getir.
+- Final yalnızca 'meğer cinmiş' diyerek aniden kapanmasın; önceden verilen ipuçlarına bağlansın.
+- Gerçek kişi/gerçek suç kullanılıyorsa uydurma doğaüstü eylemleri onlara atfetme.
 
-REFERANS VİDEODAN GÖRSEL DİL:
-- Öncelik hareketli, karanlık, sinematik gerçek B-roll: yağmur, gece, orman, mezarlık, köy yolu, boş ev/oda/koridor, pencere, dağ, sis, su, ateş gibi atmosfer görüntüleri.
-- Her cümleyi literal olarak canlandırmak zorunda değil. Görsel hikayenin DUYGUSU ve MEKANI ile uyumlu olsun.
-- Rastgele AI yüzü kullanma; aynı karakteri farklı yüzlerle göstermektense yüz göstermeyen atmosferik B-roll tercih et.
-- Hareketli klipler 18-35 saniye civarı kalabilir. Çok hızlı kesme yapma. Yumuşak fade geçişleri tercih et.
-- Sabit fotoğraf yalnızca hareketli klip bulunamazsa yedek olsun; yavaş pan/zoom uygulanmalı.
+GÖRSEL DİL:
+- Hareketli, karanlık ve sinematik gerçek B-roll öncelikli: yağmur, orman, mezarlık, köy yolu, boş ev, kapı, sis.
+- Görsel hikâyenin mekânını ve duygusunu desteklesin; her cümleyi birebir canlandırmak zorunda değil.
+- Rastgele AI yüzleri yerine yüz göstermeyen atmosferik B-roll kullan; aynı kişiyi farklı yüzlerle sunma.
+- Hareketli klipler 18-35 saniye kalabilir; yumuşak fade kullan. Sabit fotoğraf yalnızca yedek; pan/zoom ekle.
 """.strip()
 
 SCORES = (
-    "realism",
-    "causality",
-    "concrete_detail",
-    "escalation",
-    "natural_turkish",
-    "continuity",
-    "payoff",
-    "cliche_control",
+    "realism", "causality", "concrete_detail", "escalation",
+    "natural_turkish", "continuity", "payoff", "cliche_control",
 )
 
 
@@ -62,16 +51,9 @@ def _clean(value: str) -> str:
 
 def _wiki_search(query: str, limit: int = 3) -> list[dict]:
     params = {
-        "action": "query",
-        "generator": "search",
-        "gsrsearch": query,
-        "gsrlimit": str(limit),
-        "prop": "extracts|info",
-        "exintro": "1",
-        "explaintext": "1",
-        "inprop": "url",
-        "format": "json",
-        "utf8": "1",
+        "action": "query", "generator": "search", "gsrsearch": query,
+        "gsrlimit": str(limit), "prop": "extracts|info", "exintro": "1",
+        "explaintext": "1", "inprop": "url", "format": "json", "utf8": "1",
     }
     data = _json("https://tr.wikipedia.org/w/api.php?" + urllib.parse.urlencode(params))
     out = []
@@ -89,28 +71,31 @@ def _wiki_search(query: str, limit: int = 3) -> list[dict]:
 
 
 def gather_research(topic: str, max_items: int = 4) -> dict:
-    """Collect short public factual/folklore notes; failure never fabricates research."""
+    """Retrieve brief cited folklore context; outages never fabricate source text."""
     topic = _clean(topic)[:400]
     queries = [
-        topic + " Türkiye folklor",
-        "Türk halk inanışları cin büyü nazar",
+        topic[:120] + " Anadolu folklor",
+        "Türk halk inanışları cin peri",
+        "Türk halk anlatıları cin musallat",
+        "Anadolu folkloru gece köy inanışları",
     ]
     items: list[dict] = []
-    seen = set()
+    seen: set[str] = set()
     for query in queries:
         try:
             for item in _wiki_search(query, 3):
                 key = item["url"] or item["title"]
                 if key and key not in seen:
-                    seen.add(key); items.append(item)
+                    seen.add(key)
+                    items.append(item)
                     if len(items) >= max_items:
                         break
         except Exception as exc:
-            print(f"Web research skipped for '{query[:60]}': {type(exc).__name__}", flush=True)
+            print(f"Research unavailable for '{query[:60]}': {type(exc).__name__}", flush=True)
         if len(items) >= max_items:
             break
     return {
-        "mode": "public_factual_context_only",
+        "mode": "public_folklore_context_and_motifs_only",
         "topic": topic,
         "items": items,
         "copy_source_story": False,
@@ -121,39 +106,33 @@ def gather_research(topic: str, max_items: int = 4) -> dict:
 def research_prompt(research: dict) -> str:
     items = research.get("items") or []
     if not items:
-        return "İnternet araştırmasından güvenilir not gelmedi; ayrıntı uydurup gerçek diye sunma."
-    notes = []
-    for item in items:
-        notes.append(f"- {item.get('title')}: {item.get('note')}")
+        return "Doğrulanmış internet notu yok; gerçeğe dayandığını iddia etmeden özgün kurmaca yaz."
+    notes = [f"- {item.get('title')}: {item.get('note')}" for item in items]
     return (
-        "Aşağıdaki notlar yalnızca yer/folklor/dönem atmosferi için araştırma bağlamıdır. "
-        "Cümlelerini kopyalama; gerçek kişilere doğaüstü suç isnat etme; özgün kurmaca yaz.\n" + "\n".join(notes)
+        "Bu kaynaklardan yalnız folklor motifi, yer/dönem ve atmosfer ilhamı al. "
+        "Kaynak metnini veya başkasının hikâyesini kopyalama. Gerçek kişilere kurmaca suç atfetme. "
+        "Cin, kapı çarpması ve çığlık olayları bağlama uyduğunda serbesttir.\n" + "\n".join(notes)
     )
 
 
 def quality_prompt(story: str, topic: str, minutes: int) -> str:
     sample = story.strip()
     if len(sample) > 15000:
-        head = sample[:7500]
-        tail = sample[-7500:]
-        sample = head + "\n[ORTA BÖLÜM KISALTILDI]\n" + tail
-    return f"""Aşağıdaki KAYIP FREKANS_ korku hikayesini kalite editörü gibi değerlendir.
-Konu: {topic}
-Hedef: {minutes} dakika.
-Her ölçüte 0-5 tam sayı ver:
-realism: yaşanmış olay hissi ve gündelik ayrıntı
+        sample = sample[:7500] + "\n[ORTA BÖLÜM KISALTILDI]\n" + sample[-7500:]
+    return f"""Aşağıdaki KAYIP FREKANS_ korku hikâyesini editör olarak değerlendir.
+Konu: {topic}. Hedef: {minutes} dakika. Her ölçüte 0-5 tam sayı ver:
+realism: yaşanmış gibi anlatım ve gündelik ayrıntı
 causality: neden-sonuç zinciri
-concrete_detail: somut kişi/mekan/eşya/zaman ayrıntısı
-escalation: gerilimin mantıklı basamaklarla büyümesi
-natural_turkish: doğal Türkçe ve konuşma dili
-continuity: kişi/mekan/eşya/zaman tutarlılığı
-payoff: ipuçlarını karşılayan final ve aftermath
-cliche_control: klişe, tekrar ve rastgele korku unsurundan kaçınma
-JSON dışında hiçbir şey yazma. Şema:
+concrete_detail: somut kişi/mekân/eşya/zaman ayrıntısı
+escalation: gerilimin mantıklı büyümesi
+natural_turkish: doğal Türkçe
+continuity: kişi/mekân/eşya/zaman tutarlılığı
+payoff: ipuçlarını karşılayan final ve sonrası
+cliche_control: gereksiz söz/olay tekrarını önleme. Cin görünmesi, kapı çarpması, çığlık, musallat veya paranormal karşılaşma ASLA tek başına kusur değildir; olay örgüsüne uygunsa puan kırma.
+JSON dışında yazma. Şema:
 {{"realism":0,"causality":0,"concrete_detail":0,"escalation":0,"natural_turkish":0,"continuity":0,"payoff":0,"cliche_control":0,"problems":["somut sorun"],"pass":true}}
-pass yalnızca hikaye yayınlık seviyeye yakınsa true olsun.
-
-HİKAYE:\n{sample}"""
+pass, tutarlı ve anlatılmaya değer hikâye için true olsun.
+HİKÂYE:\n{sample}"""
 
 
 def validate_quality(report: dict) -> dict:
@@ -170,9 +149,7 @@ def validate_quality(report: dict) -> dict:
     critical = ("realism", "causality", "concrete_detail", "natural_turkish", "continuity")
     passed = report.get("pass") is True and total >= 31 and all(scores[k] >= 3 for k in critical)
     result = {
-        "scores": scores,
-        "total": total,
-        "max_total": 40,
+        "scores": scores, "total": total, "max_total": 40,
         "problems": [str(x)[:280] for x in (report.get("problems") or [])[:8]],
         "passed": passed,
     }
