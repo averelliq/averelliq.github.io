@@ -39,7 +39,6 @@ def materialize_reference() -> Path:
 
 async def tts_single_stream(text: str, path: Path):
     import edge_tts
-
     boundaries = []
     communicate = edge_tts.Communicate(
         text, v3.VOICE, rate="-7%", pitch="-2Hz", boundary="WordBoundary"
@@ -69,14 +68,12 @@ def whole_file_voice_conversion(source_wav: Path, target_ref: Path, output_wav: 
     if not config.exists() or not checkpoint.exists():
         download_checkpoint(str(checkpoint_dir))
 
-    # openvoice-cli 0.0.5 wrapper'indaki enable_watermark constructor hatasini atla.
     converter = ToneColorConverter.__new__(ToneColorConverter)
     OpenVoiceBaseClass.__init__(converter, str(config), device="cpu")
     converter.watermark_model = None
     converter.version = getattr(converter.hps, "_version_", "v1")
     converter.load_ckpt(str(checkpoint))
 
-    # Speaker embedding icin kisa ornekler; asil anlatim asagida TEK dosya olarak cevrilir.
     source_seed = v3.OUT / "source-speaker-seed.wav"
     target_seed = v3.OUT / "serkan-speaker-seed.wav"
     v3.bot.run("ffmpeg", "-v", "error", "-y", "-i", source_wav,
@@ -93,17 +90,48 @@ def whole_file_voice_conversion(source_wav: Path, target_ref: Path, output_wav: 
         raise ValueError("Serkan tek-parca ses donusumu cikti uretmedi.")
 
 
-def proportional_segments(parts, total):
-    weights = [max(1, len(p.split())) for p in parts]
+def scene_segments(text: str, total: float):
+    """Sesi bolmeden metni gorsel sahnelere ayirir.
+
+    45-85 kelimelik sahneler hedeflenir. Zamanlar toplam kelime oranindan
+    hesaplanir; bu sadece gorsel planidir, ses dosyasi tek parca kalir.
+    """
+    scenes = []
+    current = []
+    current_words = 0
+    for sentence in v3.bot.sentences(text):
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        wc = len(sentence.split())
+        if current and current_words + wc > 85:
+            scenes.append(" ".join(current))
+            current = []
+            current_words = 0
+        current.append(sentence)
+        current_words += wc
+        if current_words >= 45:
+            scenes.append(" ".join(current))
+            current = []
+            current_words = 0
+    if current:
+        if scenes and len(" ".join(current).split()) < 22:
+            scenes[-1] += " " + " ".join(current)
+        else:
+            scenes.append(" ".join(current))
+
+    if not scenes:
+        scenes = [text]
+    weights = [max(1, len(s.split())) for s in scenes]
     denom = sum(weights)
     cursor = 0.0
-    segments = []
-    for i, (part, weight) in enumerate(zip(parts, weights)):
-        end = total if i == len(parts) - 1 else cursor + total * (weight / denom)
-        segments.append({"start": cursor, "end": end, "text": part,
-                         "kind": v3.category(part)})
+    out = []
+    for i, (scene, weight) in enumerate(zip(scenes, weights)):
+        end = total if i == len(scenes) - 1 else cursor + total * weight / denom
+        out.append({"start": cursor, "end": end, "text": scene,
+                    "kind": v3.category(scene)})
         cursor = end
-    return segments
+    return out
 
 
 def narrate(parts):
@@ -129,7 +157,7 @@ def narrate(parts):
 
     source_cues = v3.caption_cues(boundaries, 0.0)
     cues = [(a * ratio, b * ratio, text) for a, b, text in source_cues]
-    segments = proportional_segments(parts, total)
+    segments = scene_segments(full_text, total)
     v3.save("captions.srt", "\n\n".join(
         f"{i+1}\n{v3.bot.stamp(a)} --> {v3.bot.stamp(b)}\n{text}"
         for i, (a, b, text) in enumerate(cues)
@@ -140,18 +168,20 @@ def narrate(parts):
         "voice": "Serkan Demirci - synthetic reference",
         "mode": "single-stream TTS + whole-file voice conversion",
         "audio_chunk_merge": False,
+        "visual_scene_segmentation": "sentence groups, audio remains whole",
+        "visual_scene_count": len(segments),
         "source_seconds": source_total,
         "master_seconds": total,
         "timing_scale": ratio,
         "reference_seconds": seconds(ref),
     })
-    print(f"V4 tek-parca anlatim hazir: kaynak {source_total:.1f}s -> Serkan {total:.1f}s", flush=True)
+    print(
+        f"V4 tek-parca anlatim hazir: kaynak {source_total:.1f}s -> Serkan {total:.1f}s; "
+        f"gorsel sahne {len(segments)}", flush=True
+    )
     return total, segments, cues
 
 
-# Pexels anahtari gecersiz/limitli/ag hatali olsa da render yarida kalmasin.
-# Her cagrida farkli yerel 1080p karanlik sahne uretilir; boylece gorsel cesitlilik
-# kontrolu de gercekten farkli kaynaklarla gecilir.
 _original_asset_get = v3.Assets.get
 
 
@@ -171,47 +201,86 @@ def _offline_visual(self, key: str) -> Path:
     im = v3.Image.new("RGB", (v3.W, v3.H), base)
     d = v3.ImageDraw.Draw(im, "RGBA")
 
-    # Sis/derinlik katmanlari.
     for i in range(18):
         y = int(v3.H * i / 18)
         alpha = 8 + i * 2
         d.rectangle((0, y, v3.W, y + v3.H // 16), fill=(80, 85, 92, alpha))
 
-    # Sahne kategorisine gore soyut, fotografik olmayan karanlik siluetler.
-    if key in {"door", "corridor", "room"}:
-        x = rng.randint(610, 880)
-        d.rectangle((x, 120, x + 520, 1040), fill=(3, 3, 5, 235), outline=(80, 72, 65, 140), width=8)
-        d.ellipse((x + 430, 560, x + 450, 580), fill=(120, 95, 62, 190))
-        for off in (-420, 420):
-            d.polygon([(x + 260, 100), (x + 260 + off, 1080), (x + 260, 1080)], fill=(3, 4, 6, 110))
+    variant = counter % 5
+    if key == "door":
+        if variant in {0, 3}:
+            x = rng.randint(480, 930)
+            w = rng.randint(380, 600)
+            d.rectangle((x, 110, x + w, 1040), fill=(3, 3, 5, 240),
+                        outline=(90, 72, 60, 155), width=8)
+            d.ellipse((x + w - 85, 550, x + w - 62, 573), fill=(155, 110, 55, 190))
+        elif variant == 1:
+            d.polygon([(250, 1080), (740, 170), (1180, 170), (1690, 1080)], fill=(4, 4, 7, 235))
+            d.rectangle((790, 250, 1130, 970), fill=(1, 1, 2, 250))
+        elif variant == 2:
+            d.rectangle((120, 220, 760, 1030), fill=(4, 4, 6, 235))
+            d.rectangle((1200, 120, 1780, 1030), fill=(2, 2, 4, 245))
+        else:
+            d.rectangle((720, 80, 1210, 1030), fill=(2, 2, 4, 245))
+            d.polygon([(0, 1080), (720, 520), (720, 1030)], fill=(0, 0, 0, 150))
+            d.polygon([(1920, 1080), (1210, 520), (1210, 1030)], fill=(0, 0, 0, 150))
+    elif key == "corridor":
+        vanish = rng.randint(820, 1100)
+        d.polygon([(0, 0), (vanish, 390), (vanish, 760), (0, 1080)], fill=(4, 4, 7, 230))
+        d.polygon([(1920, 0), (vanish, 390), (vanish, 760), (1920, 1080)], fill=(7, 6, 8, 235))
+        d.rectangle((vanish - 90, 400, vanish + 90, 780), fill=(1, 1, 2, 245))
+        for i in range(1, 6):
+            y = 390 + i * 95
+            d.line((0, y + 90, 1920, y), fill=(55, 52, 58, 80), width=3)
+    elif key == "room":
+        d.rectangle((0, 740, 1920, 1080), fill=(8, 7, 9, 245))
+        if variant % 2 == 0:
+            d.rectangle((260, 610, 1180, 920), fill=(18, 16, 20, 245), outline=(70, 62, 72, 110), width=5)
+            d.rectangle((260, 520, 1180, 630), fill=(22, 19, 24, 240))
+        else:
+            d.rectangle((1220, 160, 1710, 980), fill=(3, 3, 5, 245), outline=(60, 55, 65, 120), width=6)
+            d.line((1465, 160, 1465, 980), fill=(65, 58, 68, 110), width=5)
     elif key == "window":
-        d.rectangle((600, 170, 1320, 830), fill=(6, 10, 16, 240), outline=(105, 110, 120, 150), width=8)
-        d.line((960, 170, 960, 830), fill=(105, 110, 120, 150), width=6)
-        d.line((600, 500, 1320, 500), fill=(105, 110, 120, 150), width=6)
+        x = rng.randint(430, 850)
+        d.rectangle((x, 150, x + 720, 850), fill=(5, 10, 16, 245), outline=(100, 110, 125, 155), width=8)
+        d.line((x + 360, 150, x + 360, 850), fill=(100, 110, 125, 150), width=6)
+        d.line((x, 500, x + 720, 500), fill=(100, 110, 125, 150), width=6)
+        for _ in range(45):
+            rx = rng.randint(x + 10, x + 710)
+            ry = rng.randint(160, 840)
+            d.line((rx, ry, rx - 12, ry + 32), fill=(150, 170, 190, 70), width=2)
     elif key == "stairs":
-        for i in range(11):
-            y = 1040 - i * 78
-            x = 250 + i * 65
-            d.rectangle((x, y, 1680 - i * 55, y + 42), fill=(36, 32, 38, 210))
+        side = -1 if variant % 2 else 1
+        for i in range(12):
+            y = 1030 - i * 72
+            offset = i * 52 * side
+            d.rectangle((340 + offset, y, 1580 + offset, y + 38), fill=(34, 30, 38, 220))
     elif key == "forest":
-        for _ in range(24):
-            x = rng.randint(0, v3.W)
-            w = rng.randint(28, 80)
-            d.rectangle((x, 0, x + w, v3.H), fill=(3, 9, 6, rng.randint(120, 220)))
+        for _ in range(34):
+            x = rng.randint(-80, v3.W)
+            w = rng.randint(24, 90)
+            d.rectangle((x, 0, x + w, v3.H), fill=(2, 8, 5, rng.randint(110, 225)))
+            if rng.random() < .5:
+                d.line((x + w // 2, 450, x + rng.randint(-260, 260), 160), fill=(4, 11, 7, 160), width=18)
     elif key == "candle":
-        d.rectangle((900, 560, 1020, 1040), fill=(120, 95, 62, 170))
-        d.ellipse((895, 420, 1025, 650), fill=(240, 170, 80, 130))
-        d.ellipse((925, 455, 995, 610), fill=(255, 220, 145, 190))
-    else:  # house ve digerleri
-        d.polygon([(420, 620), (960, 250), (1510, 620), (1430, 1030), (500, 1030)], fill=(4, 5, 7, 235))
-        d.rectangle((850, 680, 1070, 1030), fill=(2, 2, 3, 245))
+        cx = rng.randint(650, 1250)
+        d.rectangle((cx - 55, 560, cx + 55, 1040), fill=(120, 92, 58, 180))
+        d.ellipse((cx - 85, 405, cx + 85, 655), fill=(238, 165, 75, 125))
+        d.ellipse((cx - 42, 455, cx + 42, 610), fill=(255, 220, 145, 200))
+    else:
+        shift = rng.randint(-180, 180)
+        d.polygon([(420 + shift, 620), (960 + shift, 250), (1510 + shift, 620),
+                   (1430 + shift, 1030), (500 + shift, 1030)], fill=(4, 5, 7, 238))
+        d.rectangle((850 + shift, 680, 1070 + shift, 1030), fill=(2, 2, 3, 248))
+        if variant in {1, 4}:
+            d.ellipse((130, 90, 380, 340), fill=(150, 155, 165, 38))
 
-    # Hafif vignette + rastgele sis cizgileri.
-    for _ in range(22):
-        y = rng.randint(80, 1000)
-        x1 = rng.randint(-200, 900)
-        x2 = rng.randint(1050, 2150)
-        d.line((x1, y, x2, y + rng.randint(-35, 35)), fill=(145, 150, 160, rng.randint(8, 22)), width=rng.randint(2, 8))
+    for _ in range(26):
+        y = rng.randint(70, 1020)
+        x1 = rng.randint(-300, 850)
+        x2 = rng.randint(1070, 2250)
+        d.line((x1, y, x2, y + rng.randint(-45, 45)),
+               fill=(145, 150, 160, rng.randint(7, 24)), width=rng.randint(2, 9))
     for i in range(10):
         margin = i * 24
         d.rectangle((margin, margin, v3.W - margin - 1, v3.H - margin - 1),
