@@ -15,9 +15,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 95
     env:
-      # Optional PRIVATE secret: base64 of the ORIGINAL complete 44.5s MP3.
-      # Without it the repository's ~10s excerpt is used and the report
-      # clearly says the full original reference was unavailable.
+      # The PRIVATE full-length reference is an Opus file transported via
+      # three secrets because GitHub restricts each secret to 48 KB.
+      # They are parts of encoded REFERENCE INPUT, not parts of TTS OUTPUT.
+      KF_REF_OPUS_B64_1: ${{ secrets.KF_REF_OPUS_B64_1 }}
+      KF_REF_OPUS_B64_2: ${{ secrets.KF_REF_OPUS_B64_2 }}
+      KF_REF_OPUS_B64_3: ${{ secrets.KF_REF_OPUS_B64_3 }}
+      # Legacy optional short reference; a complete MP3 cannot fit here.
       KF_FULL_REFERENCE_B64: ${{ secrets.KF_FULL_REFERENCE_B64 }}
       HF_HUB_DISABLE_TELEMETRY: '1'
     steps:
@@ -44,6 +48,7 @@ jobs:
           retention-days: 7
           compression-level: 0
           if-no-files-found: warn
+          # Never upload reference-full-private.opus or ref-window-*.wav.
           path: |
             output/voice-audition/serkan-v6-*.wav
             output/voice-audition/voice_audition_v6.json
