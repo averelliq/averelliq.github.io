@@ -1,8 +1,9 @@
-"""V6 direct Turkish reference voice audition (not Edge/Ahmet).
+"""V6 direct Turkish reference-voice audition; NEVER claims continuous long TTS.
 
-This creates three short listening samples, NOT one-call long-form TTS.
-The pinned PyPI chatterbox-tts==0.1.7 does not accept a t3_model argument;
-its default multilingual checkpoint is used. No voice match is assumed.
+Three GitHub Actions secrets transport a full 44-second reference as 16 kbps
+Opus. This is transport of ONE reference, not generation/stitching of voice
+chunks. The original MP3 and the decoded reference are never committed or
+included in the published Actions artifact.
 """
 from __future__ import annotations
 
@@ -26,6 +27,9 @@ SETTINGS = (
     ('tok', 0.55, 0.30),
     ('gerilim', 0.65, 0.30),
 )
+# Check the exact private Opus reference supplied by the user. A hash is not
+# a password and does not reveal or publish the recording.
+EXPECTED_OPUS_SHA256 = 'b86b814f69fd68caf8492d2bc88fd3065ebb011010a4660b9231133b6c7cfbca'
 
 
 def probe_seconds(path: Path) -> float:
@@ -40,20 +44,48 @@ def probe_seconds(path: Path) -> float:
 
 
 def load_reference(out: Path, fallback: Path) -> tuple[Path, bool]:
-    """Prefer an Actions secret containing the original MP3; never print/export it."""
-    encoded = os.getenv('KF_FULL_REFERENCE_B64', '').strip()
-    if encoded:
-        raw = base64.b64decode(encoded, validate=True)
-        if not raw or len(raw) > 20_000_000:
-            raise ValueError('Full reference is empty or too large')
-        ref = out / 'reference-full.mp3'
+    """Prefer three private GitHub secrets; never print the raw audio or keys.
+
+    Three pieces are only a transport workaround for GitHub's 48KB/secret
+    limit. They are decoded into ONE complete audio file before any TTS call.
+    """
+    pieces = [os.getenv(f'KF_REF_OPUS_B64_{i}', '').strip() for i in range(1, 4)]
+    if any(pieces):
+        if not all(pieces):
+            raise ValueError('Full reference is incomplete: all 3 KF_REF_OPUS_B64 secrets are required')
+        encoded = ''.join(pieces)
+        try:
+            raw = base64.b64decode(encoded, validate=True)
+        except (ValueError, base64.binascii.Error) as exc:
+            raise ValueError('Invalid private voice reference encoding') from exc
+        if not raw.startswith(b'OggS') or len(raw) > 2_000_000:
+            raise ValueError('Invalid private Ogg Opus voice reference')
+        if hashlib.sha256(raw).hexdigest() != EXPECTED_OPUS_SHA256:
+            raise ValueError('Private voice reference integrity mismatch; check the 3 secret values')
+        ref = out / 'reference-full-private.opus'
         ref.write_bytes(raw)
         from_secret = True
     else:
-        # Repository currently has a roughly ten-second EXCERPT, not the 44.5s original.
-        import cloud_v4
-        ref = cloud_v4.materialize_reference()
-        from_secret = False
+        # Backward compatibility for a genuinely SHORT (<48KB) legacy secret;
+        # a 44.5s original MP3 cannot fit a single GitHub Actions secret.
+        encoded = os.getenv('KF_FULL_REFERENCE_B64', '').strip()
+        if encoded:
+            if len(encoded) >= 48 * 1024:
+                raise ValueError('GitHub secret exceeds 48KB; use 3 private Opus secrets')
+            try:
+                raw = base64.b64decode(encoded, validate=True)
+            except (ValueError, base64.binascii.Error) as exc:
+                raise ValueError('Invalid legacy reference encoding') from exc
+            if not raw or len(raw) > 20_000_000:
+                raise ValueError('Legacy reference empty or too large')
+            ref = out / 'reference-full.mp3'
+            ref.write_bytes(raw)
+            from_secret = True
+        else:
+            # The public repository contains only a roughly 10s EXCERPT.
+            import cloud_v4
+            ref = cloud_v4.materialize_reference()
+            from_secret = False
     duration = probe_seconds(ref)
     if duration < 8 or duration > 120:
         raise ValueError(f'Reference duration outside supported 8-120s: {duration:.2f}')
@@ -66,8 +98,9 @@ def audition(output: Path, fallback: Path | None = None) -> dict:
     duration = probe_seconds(ref)
     full_reference = from_secret and 35 <= duration <= 60
 
-    # Each model call conditions on ~10s, not the entire original at once.
-    # Cover beginning, middle and end when a full recording is provided.
+    # Chatterbox's conditional prompt is ~10s even when the full original is
+    # available. Try three distinct reference positions; do not imply that
+    # the model consumes the entire 44s in a single inference.
     offsets = [0.0, max(0.0, (duration - 10) / 2), max(0.0, duration - 10)]
     for i, offset in enumerate(offsets):
         subprocess.run([
@@ -84,8 +117,7 @@ def audition(output: Path, fallback: Path | None = None) -> dict:
         raise RuntimeError('Requires chatterbox-tts, torch and soundfile') from exc
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    # PyPI version 0.1.7 signature: from_pretrained(device); t3_model='v3'
-    # exists in newer upstream sources but NOT this pinned release.
+    # PyPI chatterbox-tts 0.1.7 only accepts device; do NOT supply t3_model.
     model = ChatterboxMultilingualTTS.from_pretrained(device=device)
     clips = []
     for i, (name, exaggeration, cfg_weight) in enumerate(SETTINGS):
@@ -115,6 +147,7 @@ def audition(output: Path, fallback: Path | None = None) -> dict:
         'source_speaker': 'reference audio (NOT Edge/Ahmet)',
         'reference_duration_seconds': round(duration, 3),
         'full_44s_reference_available': full_reference,
+        'reference_transport': ('private Actions secrets' if from_secret else 'public 10s excerpt'),
         'reference_sha256': hashlib.sha256(ref.read_bytes()).hexdigest(),
         'reference_window_seconds': 10,
         'human_approval_required': True,
