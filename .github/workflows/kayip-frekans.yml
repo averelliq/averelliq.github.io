@@ -37,11 +37,11 @@ jobs:
         with:
           python-version: '3.11'
       - name: Test bagimliliklari
-        run: pip install Pillow==11.3.0
+        run: pip install Pillow==11.3.0 numpy==1.26.4
       - name: Turkce giris ve kalite testleri
         run: python -m unittest discover -s kayip_frekans -p 'test_*.py' -v
       - name: Python sozdizimi
-        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/cloud_v4.py kayip_frekans/quality.py
+        run: python -m py_compile kayip_frekans/bot.py kayip_frekans/cloud_v2.py kayip_frekans/cloud_v3.py kayip_frekans/cloud_v4.py kayip_frekans/cloud_v5.py kayip_frekans/audio_quality_v5.py kayip_frekans/visual_balance_v5.py kayip_frekans/quality.py
   video:
     if: github.event.repository.private == false && github.event_name != 'pull_request'
     needs: quality
@@ -82,22 +82,22 @@ jobs:
         timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && inputs.test != true && 120 || 15 }}
         run: |
           if [ "$SHORT_TEST" = "true" ]; then
-            python -u kayip_frekans/cloud_v4.py --stage story --smoke
+            python -u kayip_frekans/cloud_v5.py --stage story --smoke
           else
-            python -u kayip_frekans/cloud_v4.py --stage story
+            python -u kayip_frekans/cloud_v5.py --stage story
           fi
-      - name: Tek parca Serkan sesi ve kelime zamanli altyazi
+      - name: Tek akista ses, kontrollu duraklama ve altyazi
         timeout-minutes: 90
-        run: python -u kayip_frekans/cloud_v4.py --stage narration
-      - name: Fotograf sec ve 1080p video olustur
+        run: python -u kayip_frekans/cloud_v5.py --stage narration
+      - name: Baglama uygun sahneler ve 1080p video
         timeout-minutes: 45
-        run: python -u kayip_frekans/cloud_v4.py --stage render
-      - name: Hazir videoyu indirilebilir yap
+        run: python -u kayip_frekans/cloud_v5.py --stage render
+      - name: Videoyu ve ses kalitesi raporunu kaydet
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: KAYIP-FREKANS-${{ github.run_number }}
-          retention-days: 1
+          retention-days: 7
           compression-level: 0
           if-no-files-found: warn
           path: |
@@ -110,6 +110,7 @@ jobs:
             output/metadata.json
             output/validation.json
             output/quality_report.json
+            output/audio_quality_v5_report.json
             output/voice_pipeline.json
             output/narration.wav
             output/scene_plan.json
