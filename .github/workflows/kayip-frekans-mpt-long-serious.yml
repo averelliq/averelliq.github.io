@@ -29,7 +29,7 @@ env:
 
 jobs:
   story:
-    name: 1 - Referans tarzinda uzun cinli hikaye ve kalite kapisi
+    name: 1 - Internetten kamu mali hikaye, Turkce uyarlama ve kalite kapisi
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     env:
@@ -75,7 +75,7 @@ jobs:
           assert text, 'Ollama warm-up returned no content'
           print('Ollama warm-up OK')
           PY
-      - name: Hook-first uzun hikayeyi yaz, internet baglamini kaydet ve kaliteyi puanla
+      - name: Kamu mali internet hikayesini uyarlayarak hook-first uzun metin ve kalite kontrolu
         timeout-minutes: 120
         run: |
           python -u kayip_frekans/mpt_long_story.py \
@@ -93,6 +93,8 @@ jobs:
             output/long-test/story.txt
             output/long-test/narration_script.txt
             output/long-test/story_state.json
+            output/long-test/story_source.json
+            output/long-test/story_source_credit.txt
             output/long-test/research_sources.json
             output/long-test/reference_style_quality.json
 
@@ -149,6 +151,8 @@ jobs:
             output/long-test/story.txt
             output/long-test/narration_script.txt
             output/long-test/story_state.json
+            output/long-test/story_source.json
+            output/long-test/story_source_credit.txt
             output/long-test/research_sources.json
             output/long-test/reference_style_quality.json
             output/long-test/narration.wav
@@ -218,6 +222,8 @@ jobs:
             output/long-test/narration_script.txt
             output/long-test/captions.srt
             output/long-test/story_state.json
+            output/long-test/story_source.json
+            output/long-test/story_source_credit.txt
             output/long-test/research_sources.json
             output/long-test/reference_style_quality.json
             output/long-test/tts_report.json
