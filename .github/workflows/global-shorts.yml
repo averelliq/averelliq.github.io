@@ -18,9 +18,11 @@ on:
           - history
           - everyday
         default: auto
+  push:
+    paths:
+      - ".github/shorts-emergency-now"
   schedule:
     # UTC cron; Türkiye time: 08:15, 16:15, 00:15 (next calendar day).
-    # 08:15 science, 16:15 history, 00:15 everyday.
     - cron: "15 5 * * *"
     - cron: "15 13 * * *"
     - cron: "15 21 * * *"
@@ -44,13 +46,14 @@ jobs:
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
       YT_DATA_API_KEY: ${{ secrets.YT_DATA_API_KEY }}
       YOUTUBE_PRIVACY: public
-      GEMINI_MODEL: gemini-3.8-flash
-      GEMINI_FALLBACK_MODELS: gemini-3.7-flash,gemini-3.5-flash-lite,gemini-2.5-flash-lite
+      GEMINI_MODEL: gemini-2.5-flash-lite
+      GEMINI_FALLBACK_MODELS: gemini-2.5-flash
       TTS_VOICE: am_michael
       SHORTS_THEME: ${{ inputs.theme || 'auto' }}
       SHORTS_AI_REVIEW: '1'
       SHORTS_TREND_MODE: auto
       SHORTS_SKIP_UPLOAD: ${{ inputs.smoke_test == true && '1' || '0' }}
+      EMERGENCY_FORCE_UPLOAD: ${{ github.event_name == 'push' && '1' || '0' }}
 
     steps:
       - name: Checkout
@@ -92,7 +95,12 @@ jobs:
           PY
 
       - name: Generate, review and upload Short
-        run: python shorts_bot/quality_entry.py
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            python shorts_bot/emergency_short.py
+          else
+            python shorts_bot/quality_entry.py
+          fi
 
       - name: Save generated Short for debugging
         if: always()
