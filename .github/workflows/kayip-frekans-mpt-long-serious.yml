@@ -37,12 +37,17 @@ jobs:
     name: 1 - Uzun cinli hikaye ve kanal girisi
     runs-on: ubuntu-24.04
     timeout-minutes: 150
+    env:
+      KF_STORY_MODEL: gemma3:4b
+      OLLAMA_NUM_PARALLEL: '1'
+      OLLAMA_MAX_LOADED_MODELS: '1'
+      OLLAMA_KEEP_ALIVE: '30m'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Ucretsiz hikaye motorunu kur
+      - name: Ucretsiz hikaye motorunu kur ve dusuk bellekle isit
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg fonts-dejavu-core curl
@@ -50,13 +55,31 @@ jobs:
           pip install Pillow==11.3.0
           curl --fail --location --retry 3 https://ollama.com/install.sh -o /tmp/install-ollama.sh
           sh /tmp/install-ollama.sh
-          ollama serve >/tmp/ollama.log 2>&1 &
+          sudo systemctl stop ollama || true
+          nohup ollama serve >/tmp/ollama.log 2>&1 &
           for attempt in $(seq 1 45); do
             if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null; then break; fi
             sleep 2
           done
           curl -fsS http://127.0.0.1:11434/api/tags >/dev/null
           ollama pull gemma3:4b
+          for attempt in 1 2 3; do
+            if curl -fsS --max-time 180 http://127.0.0.1:11434/api/chat \
+              -H 'Content-Type: application/json' \
+              -d '{"model":"gemma3:4b","stream":false,"keep_alive":"30m","messages":[{"role":"user","content":"Sadece TAMAM yaz."}],"options":{"num_ctx":1024,"num_predict":16,"num_thread":2}}' \
+              >/tmp/ollama-warmup.json; then
+              break
+            fi
+            sleep $((attempt * 8))
+          done
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('/tmp/ollama-warmup.json').read_text())
+          text=str(data.get('message',{}).get('content','')).strip()
+          assert text, 'Ollama warm-up returned no content'
+          print('Ollama warm-up OK')
+          PY
       - name: Hook ile baslayan 15-20 dk cinli hikayeyi yaz ve girisi hook sonrasina koy
         timeout-minutes: 120
         run: |
