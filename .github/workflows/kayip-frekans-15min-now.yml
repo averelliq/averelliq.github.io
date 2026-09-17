@@ -1,4 +1,4 @@
-name: KAYIP FREKANS - 15 Dakika Analiz Videosu
+name: KAYIP FREKANS - 15 Dakika Analiz Videosu V3
 on:
   push:
     paths:
@@ -6,39 +6,106 @@ on:
 permissions:
   contents: read
 jobs:
-  full-video:
+  source:
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
-    env:
-      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-      TARGET_MINUTES: '15'
-      SHORT_TEST: 'false'
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Ses ve video araclarini kur
+      - name: Tek akış TTS araclarini kur
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg fonts-dejavu-core
-          python -m pip install --upgrade pip
+          pip install edge-tts==7.2.8 Pillow==11.3.0
+      - name: 15 dakikalik hikaye ve tek TTS akisi
+        run: |
+          python -u kayip_frekans/fixed_15_story.py
+          python -u kayip_frekans/prepare_parallel_audio.py
+      - name: Kaynak sesi yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: KF-SOURCE-${{ github.run_id }}
+          retention-days: 1
+          compression-level: 0
+          path: |
+            output/narration-source.wav
+            output/serkan-reference.mp3
+            output/source_cues.json
+            output/state.json
+            output/scene_plan.json
+            output/story.txt
+            output/story_only.txt
+            output/intro.txt
+            output/quality_report.json
+  convert:
+    needs: source
+    strategy:
+      fail-fast: false
+      matrix:
+        index: [0, 1, 2, 3, 4, 5]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Serkan dönüştürücüyü kur
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
           pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.1
           pip install -r kayip_frekans/requirements.txt
           pip install --no-deps openvoice-cli==0.0.5
-      - name: Analiz icin 15 dakikalik hikayeyi hazirla
-        run: python -u kayip_frekans/fixed_15_story.py
-      - name: Tek parca Serkan anlatimi
-        timeout-minutes: 90
-        run: python -u kayip_frekans/cloud_v4.py --stage narration
-      - name: 1080p videoyu render et
-        timeout-minutes: 60
-        run: python -u kayip_frekans/cloud_v4.py --stage render
-      - name: Ciktilari yukle
+      - uses: actions/download-artifact@v4
+        with:
+          name: KF-SOURCE-${{ github.run_id }}
+          path: output
+      - name: Serkan dönüşüm penceresi ${{ matrix.index }}
+        run: python -u kayip_frekans/convert_parallel_window.py --index ${{ matrix.index }} --count 6 --overlap 0.4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KF-CONV-${{ matrix.index }}
+          retention-days: 1
+          compression-level: 0
+          path: output/conv-${{ matrix.index }}.wav
+  final:
+    needs: convert
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Render araclarini kur
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          pip install Pillow==11.3.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: KF-SOURCE-${{ github.run_id }}
+          path: output
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: KF-CONV-*
+          path: output/chunks
+          merge-multiple: true
+      - name: Serkan pencerelerini tek kesintisiz sese birlestir
+        run: python -u kayip_frekans/combine_parallel_audio.py --count 6 --overlap 0.4
+      - name: 1080p analiz videosunu render et
+        timeout-minutes: 15
+        run: python -u -c "import sys; sys.path.insert(0,'kayip_frekans'); import cloud_v3 as v3; v3.FPS=15; import cloud_v4; v3.main()" --stage render
+      - name: Final videoyu yukle
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: KAYIP-FREKANS-15MIN-ANALIZ
+          name: KAYIP-FREKANS-15MIN-ANALIZ-FINAL
           retention-days: 1
           compression-level: 0
           if-no-files-found: warn
