@@ -1,10 +1,6 @@
 name: KAYIP FREKANS - V6 Serkan Ses Denemesi
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - .github/workflows/kayip-frekans-v6-voice-audition.yml
-      - kayip_frekans/voice_preview_v6.py
 permissions:
   contents: read
 concurrency:
@@ -15,20 +11,23 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 95
     env:
-      # The PRIVATE full-length reference is an Opus file transported via
-      # three secrets because GitHub restricts each secret to 48 KB.
-      # They are parts of encoded REFERENCE INPUT, not parts of TTS OUTPUT.
+      # Three PRIVATE transport fragments of ONE complete 44-second Opus input.
+      # Never commit or log the audio or any of these secret values.
       KF_REF_OPUS_B64_1: ${{ secrets.KF_REF_OPUS_B64_1 }}
       KF_REF_OPUS_B64_2: ${{ secrets.KF_REF_OPUS_B64_2 }}
       KF_REF_OPUS_B64_3: ${{ secrets.KF_REF_OPUS_B64_3 }}
-      # Legacy optional short reference; a complete MP3 cannot fit here.
-      KF_FULL_REFERENCE_B64: ${{ secrets.KF_FULL_REFERENCE_B64 }}
       HF_HUB_DISABLE_TELEMETRY: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Tam gizli referans on kosulu
+        run: |
+          if [[ -z "$KF_REF_OPUS_B64_1" || -z "$KF_REF_OPUS_B64_2" || -z "$KF_REF_OPUS_B64_3" ]]; then
+            echo '::error::44 saniyelik referans icin KF_REF_OPUS_B64_1/2/3 secrets eksik. Ucretli model kurulumuna veya kisa public sese dusulmedi.'
+            exit 1
+          fi
       - name: FFmpeg ve ucretsiz CPU modelini kur
         run: |
           sudo apt-get update -qq
@@ -36,7 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0 torchaudio==2.6.0
           pip install chatterbox-tts==0.1.7 soundfile
-      - name: Dogrudan referansla uc Turkce ses denemesi
+      - name: Dogrudan tam referansla uc Turkce ses denemesi
         timeout-minutes: 75
         run: |
           python -u kayip_frekans/voice_preview_v6.py --output output/voice-audition
@@ -48,7 +47,7 @@ jobs:
           retention-days: 7
           compression-level: 0
           if-no-files-found: warn
-          # Never upload reference-full-private.opus or ref-window-*.wav.
+          # The PRIVATE source and 10s reference windows are never artifacts.
           path: |
             output/voice-audition/serkan-v6-*.wav
             output/voice-audition/voice_audition_v6.json
