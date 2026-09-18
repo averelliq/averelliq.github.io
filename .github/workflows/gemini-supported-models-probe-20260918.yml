@@ -1,0 +1,37 @@
+name: Gemini Available Models Probe (No Upload)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/gemini-supported-models-probe-20260918.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check-models:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - name: Identify permitted text and image understanding models without exposing API key
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request, urllib.error
+          key=os.environ.get('GEMINI_API_KEY','').strip()
+          assert key, 'GEMINI_API_KEY secret missing'
+          req=urllib.request.Request('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',headers={'x-goog-api-key': key})
+          try:
+              with urllib.request.urlopen(req,timeout=45) as response:
+                  print('LIST STATUS',response.status,flush=True)
+                  data=json.load(response)
+                  for m in data.get('models',[]):
+                      if 'generateContent' in m.get('supportedGenerationMethods',[]):
+                          print('AVAILABLE',m['name'],'INPUT',m.get('inputTokenLimit'),'DISPLAY',m.get('displayName','')[:100],flush=True)
+          except urllib.error.HTTPError as exc:
+              print('LIST STATUS',exc.code,'DETAIL',exc.read(1000).decode('utf-8','replace')[:700],flush=True)
+              raise
+          PY
