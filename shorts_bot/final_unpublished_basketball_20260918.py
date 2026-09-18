@@ -15,8 +15,8 @@ def main() -> None:
     scenes = original.PLANS['basketball']['scenes']
     scenes[4].update({
         'voiceover': 'The flexible rubber shell springs back after impact, so another dribble can begin. One new mystery every day. Subscribe for more.',
-        'query': 'basketball player dribbling',
-        'backup_queries': ['basketball bouncing repeatedly', 'basketball dribbling court'],
+        'query': 'basketball bouncing repeatedly',
+        'backup_queries': ['basketball dribbling closeup', 'basketball bouncing court'],
         'caption': 'The ball springs back',
     })
     original.verify_all()
