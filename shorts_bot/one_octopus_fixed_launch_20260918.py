@@ -8,9 +8,13 @@ from __future__ import annotations
 import one_octopus_live_20260918 as short
 
 
-if __name__ == "__main__":
+def apply_fix() -> None:
     short.PLAN["scenes"][0]["voiceover"] = (
         "Three hearts. Blue blood. Eight astonishing arms. "
         "Meet the octopus, the ocean's remarkable escape artist."
     )
+
+
+if __name__ == "__main__":
+    apply_fix()
     short.main()
