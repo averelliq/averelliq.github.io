@@ -1,8 +1,6 @@
-"""Fail-closed photographic video gate for the scheduled bot and live-action reruns.
+"""Fail-closed photographic video gate for scheduled and one-shot Shorts.
 
-Stock footage already has independent narration relevance review. This additional
-vision check prevents posters, diagrams, screen recordings and title slides from
-being passed off as real camera footage. No API access means NO upload.
+Keep searching when footage is illustrated; an unavailable model blocks upload.
 """
 from __future__ import annotations
 
@@ -13,6 +11,10 @@ from pathlib import Path
 
 import requests
 import visual_guard
+
+
+class NotLiveFootage(ValueError):
+    """A functioning model found an illustration, slide or inconclusive frame."""
 
 
 _PROMPT = (
@@ -64,11 +66,11 @@ def _verify(images: list[bytes], label: str) -> str:
             checks = data.get("frames")
             if (data.get("filmed") is not True or not isinstance(checks, list)
                     or len(checks) != 3 or any(flag is not True for flag in checks)):
-                raise ValueError(f"{label}: not reliably filmed real-world footage: {str(data.get('reason'))[:240]}")
+                raise NotLiveFootage(f"{label}: not reliably filmed real-world footage: {str(data.get('reason'))[:240]}")
             subject = data.get("subject")
             reason = data.get("reason")
             if not isinstance(subject, str) or len(subject.strip()) < 5 or not isinstance(reason, str) or len(reason.strip()) < 12:
-                raise ValueError(f"{label}: photographic proof missing")
+                raise NotLiveFootage(f"{label}: photographic proof missing")
             print(f"FILMED FOOTAGE APPROVED {label}: {subject[:90]} — {reason[:140]}", flush=True)
             return subject[:200]
         except (requests.RequestException, KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
@@ -89,7 +91,11 @@ def install() -> None:
         if not approved:
             return approved, explanation
         files = [work / f"candidate_{index:02d}_{number}.jpg" for number in range(3)]
-        proof = _verify([path.read_bytes() for path in files], f"candidate scene {index + 1}")
+        try:
+            proof = _verify([path.read_bytes() for path in files], f"candidate scene {index + 1}")
+        except NotLiveFootage as exc:
+            # Search the next stock clip, never accept a rejected illustration.
+            return False, str(exc)
         scene["live_action_evidence"] = proof
         return True, explanation + "; filmed: " + proof
 
