@@ -122,9 +122,24 @@ def choose(scene: dict[str, Any], index: int) -> Path:
                     continue
                 approved, explanation = visual_guard.review_candidate(
                     scene, target, upgrade.bot.WORK, index)
+            except ValueError as exc:
+                # A nearly black, missing, or undecodable JPEG is a defect of
+                # THIS stock item, not a model outage. Discard it and evaluate
+                # the NEXT candidate. All remaining footage still MUST pass
+                # BOTH independent vision reviews; no upload on uncertainty.
+                if str(exc) in {
+                    "A clip's cropped preview frame is missing/invalid",
+                    "Stock video fingerprint image invalid",
+                }:
+                    target.unlink(missing_ok=True)
+                    reasons.append(f"Stock {video_id}: unusable preview, candidate skipped")
+                    print(f"Scene {index + 1}: skipped unusable stock preview {video_id}",flush=True)
+                    continue
+                target.unlink(missing_ok=True)
+                upgrade.bot.die(f"Scene {index + 1} preview check unavailable: ValueError: {exc}")
             except (requests.RequestException, subprocess.CalledProcessError,
-                    ValueError, OSError, KeyError, IndexError, TypeError) as exc:
-                # API/model outages are not a visual rejection: NEVER upload.
+                    OSError, KeyError, IndexError, TypeError) as exc:
+                # Genuine API/model outages are NEVER permission to upload.
                 target.unlink(missing_ok=True)
                 upgrade.bot.die(f"Scene {index + 1} preview check unavailable: {type(exc).__name__}: {exc}")
             if not approved:
