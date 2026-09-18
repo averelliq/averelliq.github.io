@@ -18,6 +18,13 @@ def run(command: list[str]) -> None:
         )
 
 
+def duration(file: Path) -> float:
+    return float(subprocess.check_output([
+        "ffprobe", "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", str(file)
+    ]).strip())
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
@@ -38,7 +45,7 @@ def main() -> None:
         voice = root / "voice.wav"
         final = root / "short.mp4"
         run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
-             "testsrc2=size=540x960:rate=24:duration=2", "-c:v", "libx264",
+             "testsrc2=size=540x960:rate=24:duration=6", "-c:v", "libx264",
              "-preset", "ultrafast", str(source)])
         state = {"motion_clips": 0, "srt": (root / "captions.srt").as_posix(),
                  "ass": captions, "music": music, "music_enabled": True,
@@ -64,10 +71,11 @@ def main() -> None:
         metadata = json.loads(subprocess.check_output([
             "ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(final)
         ]))
+        lengths = {name: duration(file) for name, file in (("source", source), ("clip", clip), ("silent", silent), ("voice", voice), ("music", music), ("final", final))}
+        print(f"Rendered stream lengths: {lengths}", flush=True)
         assert state["animated_captions"] and state["original_music"]
         assert len(metadata["streams"]) == 2
-        duration = float(metadata["format"]["duration"])
-        assert 3.5 < duration < 4.5, f"Unexpected duration={duration}; streams={[(s.get('codec_type'),s.get('duration')) for s in metadata['streams']]}"
+        assert 3.5 < lengths["final"] < 4.5, f"Unexpected durations={lengths}; streams={[(s.get('codec_type'),s.get('duration')) for s in metadata['streams']]}"
         assert {item["codec_type"] for item in metadata["streams"]} == {"video", "audio"}
         print("PASS: animated captions + original soundtrack + moving stock + real MP4 audio/video")
         print("PASS: smoke test uses no credentials, network requests or YouTube upload")
