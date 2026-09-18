@@ -1,0 +1,35 @@
+name: KAYIP FREKANS - V7 TEK SEFERLIK BASLATICI
+on:
+  push:
+    paths:
+      - .github/workflows/kayip-frekans-v7-launch-once.yml
+permissions:
+  contents: read
+  actions: write
+jobs:
+  launch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Start latest source-backed 15-minute video once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          repo = os.environ['GITHUB_REPOSITORY']
+          url = f'https://api.github.com/repos/{repo}/actions/workflows/kayip-frekans-mpt-long-serious.yml/dispatches'
+          payload = {'ref': 'main', 'inputs': {
+              'topic': 'Köyde yalnız kalan bir adam, ölen kardeşinin sesini kilitli dış kapıdan ve daha sonra evin içinden duyar. Eski aile eşyası, komşunun tanıklığı ve önceden gösterilen ipuçları finalde birleşir. Kamu malı klasik korku eseri kaynak alınarak Türkçe cinli uyarlama yapılır; gerçek olay olarak sunulmaz.',
+              'target_minutes': '15',
+          }}
+          request = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), method='POST', headers={
+              'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'Content-Type': 'application/json',
+          })
+          with urllib.request.urlopen(request, timeout=60) as response:
+              assert response.status == 204, f'Unexpected dispatch status: {response.status}'
+          print('V7 latest source-backed long-video workflow dispatched exactly once')
+          PY
