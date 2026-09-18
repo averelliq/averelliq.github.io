@@ -9,7 +9,7 @@ on:
         type: boolean
         default: false
       theme:
-        description: Choose a content format (auto cycles; scheduled runs have fixed themes)
+        description: Choose a content format (auto cycles; US evening slots have fixed themes)
         required: false
         type: choice
         options:
@@ -19,10 +19,15 @@ on:
           - everyday
         default: auto
   schedule:
-    # UTC cron; Türkiye time: 08:15, 16:15, 00:15 (next calendar day).
-    - cron: "15 5 * * *"
-    - cron: "15 13 * * *"
+    # Candidate UTC crons. The cheap gate below accepts ONLY US Eastern
+    # 16:15, 19:15 and 22:15, accounting for US daylight saving time.
+    # Pacific: 13:15, 16:15 and 19:15. No local machine required.
+    - cron: "15 20 * * *"
     - cron: "15 21 * * *"
+    - cron: "15 23 * * *"
+    - cron: "15 0 * * *"
+    - cron: "15 2 * * *"
+    - cron: "15 3 * * *"
 
 permissions:
   contents: read
@@ -32,7 +37,51 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  us-window:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      due: ${{ steps.gate.outputs.due }}
+      theme: ${{ steps.gate.outputs.theme }}
+    steps:
+      - name: Checkout US scheduling gate
+        uses: actions/checkout@v4
+      - name: Check US daylight saving time and select one of three daily windows
+        id: gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          PYTHONPATH=shorts_bot python - <<'PY'
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+          import json
+          import os
+          from us_window import publication_slot
+
+          if os.environ['EVENT_NAME'] == 'workflow_dispatch':
+              due, theme, label = True, 'auto', 'Manual run: scheduling gate bypassed'
+          else:
+              event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text(encoding='utf-8'))
+              cron = str(event.get('schedule', ''))
+              fields = cron.split()
+              if len(fields) != 5 or fields[0] != '15' or not fields[1].isdigit():
+                  raise ValueError('Unexpected scheduled cron; no video published')
+              now = datetime.now(timezone.utc)
+              # GitHub Actions scheduled jobs can start late; evaluate the
+              # scheduled UTC instant, NOT the runner's late start minute.
+              scheduled = now.replace(hour=int(fields[1]), minute=15, second=0, microsecond=0)
+              if scheduled > now + timedelta(minutes=2):
+                  scheduled -= timedelta(days=1)
+              due, theme, label = publication_slot(scheduled)
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f"due={'true' if due else 'false'}\n")
+              output.write(f"theme={theme}\n")
+          print(f'US SHORTS GATE: due={due}; theme={theme or "none"}; {label}', flush=True)
+          PY
+
   create-short:
+    needs: us-window
+    if: needs.us-window.outputs.due == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -46,9 +95,10 @@ jobs:
       GEMINI_MODEL: gemini-3.5-flash-lite
       GEMINI_FALLBACK_MODELS: gemini-3.5-flash,gemini-3.6-flash
       TTS_VOICE: am_michael
-      SHORTS_THEME: ${{ inputs.theme || 'auto' }}
+      SHORTS_THEME: ${{ github.event_name == 'schedule' && needs.us-window.outputs.theme || inputs.theme || 'auto' }}
       SHORTS_AI_REVIEW: '1'
       SHORTS_TREND_MODE: auto
+      SHORTS_US_TRENDS: '1'
       SHORTS_MAX_VISUAL_CANDIDATES: '9'
       SHORTS_MUSIC: '1'
       SHORTS_MUSIC_GAIN: '0.20'
@@ -84,7 +134,7 @@ jobs:
 
       - name: Preflight checks
         run: |
-          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py shorts_bot/editorial_upgrade.py shorts_bot/selection_guard.py shorts_bot/visual_guard.py shorts_bot/live_action_guard.py shorts_bot/trend_ideas.py shorts_bot/quality_entry.py shorts_bot/montage_fx.py shorts_bot/montage_entry.py
+          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py shorts_bot/editorial_upgrade.py shorts_bot/selection_guard.py shorts_bot/visual_guard.py shorts_bot/live_action_guard.py shorts_bot/trend_ideas.py shorts_bot/us_trends.py shorts_bot/us_window.py shorts_bot/quality_entry.py shorts_bot/montage_fx.py shorts_bot/montage_entry.py shorts_bot/gemini_transient_guard.py
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
           python - <<'PY'
@@ -93,7 +143,7 @@ jobs:
           print('Python imports OK')
           PY
 
-      - name: Generate, verify REAL live-action footage and upload enhanced Short
+      - name: Generate, verify REAL live-action footage and upload enhanced US-focused Short
         run: python shorts_bot/montage_entry.py
 
       - name: Save generated Short for debugging
