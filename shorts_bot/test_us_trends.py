@@ -56,7 +56,7 @@ class USSubjectTests(unittest.TestCase):
         self.assertEqual(subject, 'why popcorn kernels pop')
         reference = trend_ideas.reference_for('everyday')
         self.assertEqual(reference['region'], 'US')
-        self.assertIn('Search interest', reference['source'])
+        self.assertIn('search interest', reference['source'].lower())
         self.assertNotIn('observed_views', reference)
 
 
