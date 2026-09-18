@@ -1,0 +1,38 @@
+name: Inspect Octopus Stock Subject Metadata (No Upload)
+on:
+  push:
+    paths:
+      - .github/workflows/probe-octopus-real-stock-no-upload-20260918.yml
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+    steps:
+      - name: List authentic octopus stock clip IDs and descriptive URLs
+        run: |
+          python - <<'PY'
+          import json,os,urllib.parse,urllib.request
+          key=os.environ['PEXELS_API_KEY']
+          assert key
+          queries=['octopus close up underwater','octopus swimming aquarium','octopus underwater reef','octopus resting underwater','octopus aquarium','octopus crawling','octopus tentacles closeup','octopus swimming underwater','octopus']
+          already={}
+          for query in queries:
+              for page in (1,2):
+                  params=urllib.parse.urlencode({'query':query,'orientation':'portrait','per_page':30,'page':page,'locale':'en-US'})
+                  req=urllib.request.Request('https://api.pexels.com/v1/videos/search?'+params,headers={'Authorization':key})
+                  with urllib.request.urlopen(req,timeout=25) as resp:
+                      results=json.load(resp).get('videos',[])
+                  print('QUERY',repr(query),'PAGE',page,'RESULTS',len(results),flush=True)
+                  for v in results:
+                      files=[f for f in v.get('video_files',[]) if (f.get('height') or 0)>(f.get('width') or 0) and (f.get('height') or 0)>=720]
+                      if files:
+                          url=v.get('url','').split('?')[0]
+                          if v.get('id') not in already:
+                              already[v['id']]=url
+                          print('  ID',v['id'],'URL',url.rsplit('/',2)[-2:],'PORTRAIT',len(files),flush=True)
+          print('TOTAL DISTINCT PORTRAIT STOCK',len(already),'NO DOWNLOAD NO YOUTUBE UPLOAD',flush=True)
+          PY
