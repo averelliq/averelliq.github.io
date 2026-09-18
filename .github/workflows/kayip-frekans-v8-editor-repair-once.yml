@@ -23,6 +23,6 @@ jobs:
           python -m py_compile kayip_frekans/mpt_story_recovery.py kayip_frekans/mpt_long_story.py kayip_frekans/mpt_web_story.py
           python -m unittest -v kayip_frekans/test_story_recovery.py kayip_frekans/test_web_story.py
           git diff --check
-          git add kayip_frekans/mpt_story_recovery.py kayip_frekans/mpt_long_story.py kayip_frekans/test_story_recovery.py .github/workflows/kayip-frekans-mpt-long-serious.yml
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Preserve source-backed story on unverified editorial claims, bound retries and checkpoint chapters'
+          git add kayip_frekans/mpt_story_recovery.py kayip_frekans/mpt_long_story.py kayip_frekans/test_story_recovery.py
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Preserve source-backed story on unverified editorial claims and bound retries'
           git push origin HEAD:main
