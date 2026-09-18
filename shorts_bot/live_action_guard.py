@@ -48,14 +48,14 @@ def _verify(images: list[bytes], label: str) -> str:
         parts.append({"text": name + " frame:"})
         parts.append({"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(image).decode("ascii")}})
     failures = []
-    for model in ("gemini-2.5-flash", "gemini-2.5-flash-lite"):
+    for model in ("gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash"):
         try:
             response = requests.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
                 headers={"x-goog-api-key": key, "Content-Type": "application/json"},
                 json={"contents": [{"parts": parts}], "generationConfig": {
                     "responseMimeType": "application/json", "temperature": 0,
-                    "maxOutputTokens": 1024}}, timeout=120,
+                    "maxOutputTokens": 1536}}, timeout=120,
             )
             response.raise_for_status()
             result = response.json()
@@ -73,9 +73,10 @@ def _verify(images: list[bytes], label: str) -> str:
                 raise NotLiveFootage(f"{label}: photographic proof missing")
             print(f"FILMED FOOTAGE APPROVED {label}: {subject[:90]} — {reason[:140]}", flush=True)
             return subject[:200]
-        except (requests.RequestException, KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+        except (requests.RequestException, KeyError, IndexError, TypeError, json.JSONDecodeError, ValueError) as exc:
+            if isinstance(exc, NotLiveFootage):
+                raise
             failures.append(f"{model}: {type(exc).__name__}")
-            # An unavailable model is not approval; try only the known backup.
             continue
     raise RuntimeError(f"{label}: cannot verify live-action video; upload cancelled: {'; '.join(failures)}")
 
@@ -94,7 +95,6 @@ def install() -> None:
         try:
             proof = _verify([path.read_bytes() for path in files], f"candidate scene {index + 1}")
         except NotLiveFootage as exc:
-            # Search the next stock clip, never accept a rejected illustration.
             return False, str(exc)
         scene["live_action_evidence"] = proof
         return True, explanation + "; filmed: " + proof
