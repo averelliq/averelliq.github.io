@@ -1,0 +1,48 @@
+name: US Shorts Config Smoke — No Upload
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/global-shorts.yml'
+      - '.github/workflows/us-shorts-config-smoke.yml'
+      - 'shorts_bot/us_window.py'
+      - 'shorts_bot/us_trends.py'
+      - 'shorts_bot/test_us_schedule.py'
+      - 'shorts_bot/test_us_trends.py'
+      - 'shorts_bot/montage_entry.py'
+
+permissions:
+  contents: read
+
+jobs:
+  us-config-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install tiny validation dependencies only
+        run: python -m pip install 'requests==2.34.2' 'PyYAML>=6.0,<7'
+      - name: Compile US components and offline trend and DST tests
+        run: |
+          python -m py_compile shorts_bot/us_window.py shorts_bot/us_trends.py shorts_bot/montage_entry.py
+          PYTHONPATH=shorts_bot python -m unittest discover -s shorts_bot -p 'test_us_*.py' -v
+      - name: Check GitHub cron windows and no-upload test switch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+          workflow = yaml.load(Path('.github/workflows/global-shorts.yml').read_text(), Loader=yaml.BaseLoader)
+          actual = {entry['cron'] for entry in workflow['on']['schedule']}
+          expected = {f'15 {hour} * * *' for hour in (0, 2, 3, 20, 21, 23)}
+          assert actual == expected, f'UTC schedule changed: {actual}'
+          assert workflow['jobs']['create-short']['needs'] == 'us-window'
+          assert "needs.us-window.outputs.due == 'true'" in workflow['jobs']['create-short']['if']
+          assert 'SHORTS_SKIP_UPLOAD' in workflow['jobs']['create-short']['env']
+          print('PASS: six cheap cron candidates / three DST-aware US windows / no-upload option')
+          PY
