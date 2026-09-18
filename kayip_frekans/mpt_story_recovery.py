@@ -7,6 +7,7 @@ from a genuine editorial finding. The independent final quality gate stays on.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 import time
 
@@ -159,7 +160,31 @@ def _review_story(story: str, ask, draft: Path) -> dict:
                 raise ValueError("Editör yanlış JSON şeması döndürdü; hikâye tutarsızlığı değil")
             issues = [item.strip() for item in raw["issues"] if item.strip()]
             if raw["pass"] is False or issues:
-                raise StoryExhausted("Editör somut tutarsızlık bildirdi: " + str(issues)[:600])
+                # A supplementary model's unsupported opinion is NOT evidence.
+                # Run #10 discarded four full stories on vague criticism and timed out.
+                # Independently enforce the existing eight-dimension quality gate.
+                confirmed = []
+                for issue in issues:
+                    quotes = re.findall(r'[“"«]([^”"»]{14,})[”"»]', issue)
+                    grounded = [quote for quote in quotes if quote in story]
+                    lower = issue.casefold()
+                    swap = re.search(r"([\wÇĞİÖŞÜçğıöşü]+)'den\s+([\wÇĞİÖŞÜçğıöşü]+)'ye", issue)
+                    explicit_name_error = (
+                        swap is not None
+                        and all(name.casefold() in story.casefold() for name in swap.groups())
+                        and 'ismi' in lower and 'değiş' in lower
+                    )
+                    if ((len(grounded) >= 2 and ('çeliş' in lower or 'tutarsız' in lower))
+                            or explicit_name_error):
+                        confirmed.append(issue)
+                if confirmed:
+                    raise StoryExhausted("Editör metinle desteklenen tutarsızlık bildirdi: " + str(confirmed)[:600])
+                result = {"pass": None, "issues": issues,
+                          "status": "unverified_editor_claims", "attempts": attempt,
+                          "requires_independent_quality_gate": True}
+                _save(draft / "editor_unverified.json", result)
+                print("Editör kanıtsız yorum verdi; bölümler korunuyor; bağımsız kalite kapısı zorunlu.", flush=True)
+                return result
             return {"pass": True, "issues": [], "status": "verified_by_local_editor", "attempts": attempt}
         except StoryExhausted:
             raise

@@ -78,6 +78,18 @@ class RecoveryTests(unittest.TestCase):
                         "issues": ["Anlatıcının ismi gerekçesiz Ali'den Ayşe'ye değişiyor"],
                         "pass": False}, Path(folder))
 
+    def test_vague_editor_opinion_preserves_completed_story(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = mpt_story_recovery._review_story(
+                "Kardeşimin sesi geldi. Kapı tekrar çarptı, komşu kapıyı gördü.",
+                lambda prompt, structured=False: {
+                    "pass": False, "issues": ["Kapı çarpması sık tekrarlanıyor."]},
+                Path(folder))
+            self.assertIsNone(result["pass"])
+            self.assertEqual(result["status"], "unverified_editor_claims")
+            self.assertTrue(result["requires_independent_quality_gate"])
+            self.assertTrue((Path(folder) / "editor_unverified.json").exists())
+
     def test_four_failed_chapter_attempts_trigger_new_outline(self):
         count, outlines = 0, 0
         def fake_ask(prompt, structured=False):

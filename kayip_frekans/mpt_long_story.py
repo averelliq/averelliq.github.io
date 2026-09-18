@@ -155,7 +155,7 @@ def compose(topic: str, minutes: int, output: Path) -> dict:
         try:
             title, parts, report = mpt_story_recovery.generate_story(
                 revised_topic, minutes, stable_ask, output,
-                research_context=research_context, max_story_attempts=2,
+                research_context=research_context, max_story_attempts=1,
             )
             if len(parts) < 2:
                 raise ValueError("Uzun hikâyede bölüm yok")
