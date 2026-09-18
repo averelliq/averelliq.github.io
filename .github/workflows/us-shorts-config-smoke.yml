@@ -46,3 +46,15 @@ jobs:
           assert 'SHORTS_SKIP_UPLOAD' in workflow['jobs']['create-short']['env']
           print('PASS: six cheap cron candidates / three DST-aware US windows / no-upload option')
           PY
+      - name: Probe live US search-trend availability without credentials or upload
+        run: |
+          PYTHONPATH=shorts_bot python - <<'PY'
+          import requests
+          import us_trends
+          try:
+              subjects = us_trends._us_search_terms('everyday')
+              print(f'LIVE US TRENDS: reachable; eligible everyday headlines={len(subjects)}; sample={subjects[:2]}', flush=True)
+          except (requests.RequestException, ValueError) as exc:
+              print(f'LIVE US TRENDS: unavailable ({type(exc).__name__}); US-directed YouTube/evergreen fallback remains enabled', flush=True)
+          print('LIVE US FEED PROBE: no Gemini, no YouTube upload, no credentials', flush=True)
+          PY
