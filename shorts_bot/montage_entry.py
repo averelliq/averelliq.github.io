@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import editorial_upgrade
+import gemini_transient_guard
 import live_action_guard
 import quality_entry
 import montage_fx
@@ -10,6 +11,7 @@ import safe_captions
 
 def main() -> None:
     editorial_upgrade.install()
+    gemini_transient_guard.install()
     # Reject slides, vector art and unrelated footage. Failed QC means no upload.
     live_action_guard.install()
     safe_captions.install()
