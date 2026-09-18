@@ -20,8 +20,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install lightweight test requirements
-        run: python -m pip install 'numpy==2.4.6'
+      - name: Install ffmpeg and lightweight test requirements
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          python -m pip install 'numpy==2.4.6'
       - name: Assert syntax
         run: python -m py_compile shorts_bot/montage_fx.py shorts_bot/montage_entry.py shorts_bot/test_montage_fx.py
       - name: Test audio/video montage without credentials or uploads
