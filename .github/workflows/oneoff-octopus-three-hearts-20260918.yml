@@ -50,12 +50,14 @@ jobs:
           sudo apt-get install -y ffmpeg espeak-ng libsndfile1 fonts-dejavu-core
           pip install -r shorts_bot/requirements.txt
           pip check
-          python -m py_compile shorts_bot/one_octopus_live_20260918.py shorts_bot/safe_captions.py shorts_bot/montage_fx.py shorts_bot/live_action_guard.py shorts_bot/visual_guard.py shorts_bot/selection_guard.py shorts_bot/quality_entry.py shorts_bot/upgrade.py
-      - name: Check no overlong caption words and unique real-footage beats
+          python -m py_compile shorts_bot/one_octopus_live_20260918.py shorts_bot/one_octopus_fixed_launch_20260918.py shorts_bot/safe_captions.py shorts_bot/montage_fx.py shorts_bot/live_action_guard.py shorts_bot/visual_guard.py shorts_bot/selection_guard.py shorts_bot/quality_entry.py shorts_bot/upgrade.py
+      - name: Check corrected hook, short captions and distinct visual beats
         run: |
           PYTHONPATH=shorts_bot python - <<'PY'
           import safe_captions as c
+          import one_octopus_fixed_launch_20260918 as launch
           import one_octopus_live_20260918 as o
+          launch.apply_fix()
           o.validate()
           for scene in o.PLAN['scenes']:
               words=scene['voiceover'].split()
@@ -63,13 +65,13 @@ jobs:
               assert [word for group in groups for word in group]==words
               assert all(len(' '.join(group))<=c.MAX_CHARS for group in groups)
               assert all(len(group)<=c.MAX_WORDS for group in groups)
-          print('PASS: five unique filmable beats; no off-screen captions; NO UPLOAD IN TEST',flush=True)
+          print('PASS: corrected hook, five distinct beats, phone-safe caption cues; NO UPLOAD IN TEST',flush=True)
           PY
       - name: Generate one, independently inspect live-action frames, upload to YouTube
         run: |
           test "$YOUTUBE_PRIVACY" = public
           test "$SHORTS_SKIP_UPLOAD" = 0
-          python shorts_bot/one_octopus_live_20260918.py
+          python shorts_bot/one_octopus_fixed_launch_20260918.py
       - name: Preserve original MP4, scene evidence, caption source
         if: always()
         uses: actions/upload-artifact@v4
