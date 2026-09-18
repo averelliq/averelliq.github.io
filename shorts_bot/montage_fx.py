@@ -157,6 +157,10 @@ def enhance_command(command: list[str], run_original, state: dict) -> None:
     if not 0.0 <= gain <= 0.30 or not math.isfinite(gain):
         raise ValueError("SHORTS_MUSIC_GAIN must be between 0 and 0.30")
     cmd[cmd.index("-vf"):cmd.index("-vf")] = ["-i", str(path)]
+    # FFmpeg 6.1 may prematurely cut the output when -shortest is combined
+    # with loudnorm and a voice-first amix. The mix already ends with voice.
+    if "-shortest" in cmd:
+        cmd.remove("-shortest")
     cmd += ["-map", "0:v:0", "-map", "[aout]", "-filter_complex",
             "[1:a]loudnorm=I=-16:TP=-1.5:LRA=11[voice];"
             f"[2:a]volume={gain:.3f}[music];"
