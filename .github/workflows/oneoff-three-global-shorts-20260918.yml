@@ -1,0 +1,71 @@
+name: One-off Three Different Global Shorts 2026-09-18
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/oneoff-three-global-shorts-20260918.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: global-shorts-bot
+  cancel-in-progress: false
+
+jobs:
+  publish-three-original-global-shorts:
+    if: github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    env:
+      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+      YOUTUBE_PRIVACY: public
+      SHORTS_SKIP_UPLOAD: '0'
+      TTS_VOICE: am_michael
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: shorts_bot/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: kokoro-${{ runner.os }}-v1
+      - name: Install free English narrator and media dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg espeak-ng libsndfile1 fonts-dejavu-core
+          pip install -r shorts_bot/requirements.txt pillow
+          pip check
+          python -m py_compile shorts_bot/diagram_shorts.py shorts_bot/three_topics_20260918.py
+      - name: Recheck three unique factual subjects
+        run: |
+          PYTHONPATH=shorts_bot python - <<'PY'
+          import three_topics_20260918 as t
+          t.validate()
+          assert {p['slug'] for p in t.PLANS} == {'popcorn','qrcode','flamingo'}
+          assert len({p['title'] for p in t.PLANS}) == 3
+          assert all(len(p['lines'])==8 for p in t.PLANS)
+          print('PASS: three original separate topics, eight illustrated scenes each',flush=True)
+          PY
+      - name: Render all three, verify each MP4, then upload exactly three public Shorts
+        run: |
+          test "$YOUTUBE_PRIVACY" = public
+          test "$SHORTS_SKIP_UPLOAD" = 0
+          python shorts_bot/three_topics_20260918.py
+      - name: Preserve finished MP4s and original illustrations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-original-shorts-${{ github.run_id }}
+          path: |
+            shorts_bot/diagram_output/*.mp4
+            shorts_bot/diagram_work/*/scene_*.png
+          if-no-files-found: ignore
+          retention-days: 5
