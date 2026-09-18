@@ -1,0 +1,95 @@
+name: KAYIP FREKANS - V8 EDITOR REPAIR ONCE
+on:
+  push:
+    paths:
+      - .github/workflows/kayip-frekans-v8-editor-repair-once.yml
+permissions:
+  contents: write
+jobs:
+  repair-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Apply evidence-based editorial fix ONLY to KAYIP FREKANS and test before committing
+        env:
+          PYTHONPATH: kayip_frekans
+        run: |
+          python -m pip install Pillow==11.3.0
+          python - <<'PY'
+          from pathlib import Path
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              matches = text.count(old)
+              if matches != 1:
+                  raise RuntimeError(f'ABORT {path}: expected 1 target, got {matches}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+          path = 'kayip_frekans/mpt_story_recovery.py'
+          replace_once(path, 'import json\nfrom pathlib import Path', 'import json\nimport re\nfrom pathlib import Path')
+          old = '''            if raw["pass"] is False or issues:
+                raise StoryExhausted("Editör somut tutarsızlık bildirdi: " + str(issues)[:600])
+            return {"pass": True, "issues": [], "status": "verified_by_local_editor", "attempts": attempt}'''
+          new = '''            if raw["pass"] is False or issues:
+                # A model opinion is not proof of a contradiction. In run #10
+                # one quoted sentence and vague repetition claims destroyed four
+                # complete twelve-chapter drafts and exhausted the 120m job.
+                # Preserve the draft unless there is corroborating text evidence.
+                confirmed = []
+                for issue in issues:
+                    quotes = re.findall(r'[“"«]([^”"»]{14,})[”"»]', issue)
+                    excerpts = [quote for quote in quotes if quote in story]
+                    issue_lower = issue.casefold()
+                    swap = re.search(r"([\\wÇĞİÖŞÜçğıöşü]+)'den\\s+([\\wÇĞİÖŞÜçğıöşü]+)'ye", issue)
+                    explicit_name_error = (
+                        swap is not None
+                        and all(name.casefold() in story.casefold() for name in swap.groups())
+                        and 'ismi' in issue_lower and 'değiş' in issue_lower
+                    )
+                    if ((len(excerpts) >= 2 and ('çeliş' in issue_lower or 'tutarsız' in issue_lower))
+                            or explicit_name_error):
+                        confirmed.append(issue)
+                if confirmed:
+                    raise StoryExhausted("Editör metinle desteklenen tutarsızlık bildirdi: " + str(confirmed)[:600])
+                result = {"pass": None, "issues": issues,
+                          "status": "unverified_editor_claims", "attempts": attempt,
+                          "requires_independent_quality_gate": True}
+                _save(draft / "editor_unverified.json", result)
+                print("Editör kanıtsız/üslup yorumu verdi; 12 bölüm korunuyor, bağımsız kalite kapısı ZORUNLU.", flush=True)
+                return result
+            return {"pass": True, "issues": [], "status": "verified_by_local_editor", "attempts": attempt}'''
+          replace_once(path, old, new)
+          replace_once('kayip_frekans/mpt_long_story.py',
+                       'research_context=research_context, max_story_attempts=2,',
+                       'research_context=research_context, max_story_attempts=1,')
+          # If a run times out, preserve its completed chapter drafts as an artifact.
+          replace_once('.github/workflows/kayip-frekans-mpt-long-serious.yml',
+                       '            output/long-test/reference_style_quality.json\n\n  prepare:',
+                       '            output/long-test/reference_style_quality.json\n            output/long-test/recovery/**\n\n  prepare:')
+          tests = '''    def test_vague_editor_opinion_preserves_completed_story(self):
+        with tempfile.TemporaryDirectory() as folder:
+            result = mpt_story_recovery._review_story(
+                "Kardeşimin sesi geldi. Kapı tekrar çarptı, komşu kapıyı gördü.",
+                lambda prompt, structured=False: {
+                    "pass": False, "issues": ["Kapı çarpması sık tekrarlanıyor."]},
+                Path(folder))
+            self.assertIsNone(result["pass"])
+            self.assertEqual(result["status"], "unverified_editor_claims")
+            self.assertTrue(result["requires_independent_quality_gate"])
+            self.assertTrue((Path(folder) / "editor_unverified.json").exists())
+
+'''
+          replace_once('kayip_frekans/test_story_recovery.py',
+                       '    def test_four_failed_chapter_attempts_trigger_new_outline(self):',
+                       tests + '    def test_four_failed_chapter_attempts_trigger_new_outline(self):')
+          print('TARGETED PATCH APPLIED; Shorts files untouched')
+          PY
+          python -m py_compile kayip_frekans/mpt_story_recovery.py kayip_frekans/mpt_long_story.py kayip_frekans/mpt_web_story.py
+          python -m unittest -v kayip_frekans/test_story_recovery.py kayip_frekans/test_web_story.py
+          git diff --check
+          git add kayip_frekans/mpt_story_recovery.py kayip_frekans/mpt_long_story.py kayip_frekans/test_story_recovery.py .github/workflows/kayip-frekans-mpt-long-serious.yml
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Preserve sourced story drafts on unsupported editor claims; bound retries and save recovery chapters'
+          git push origin HEAD:main
