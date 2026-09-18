@@ -66,7 +66,8 @@ def main() -> None:
         ]))
         assert state["animated_captions"] and state["original_music"]
         assert len(metadata["streams"]) == 2
-        assert 3.5 < float(metadata["format"]["duration"]) < 4.5
+        duration = float(metadata["format"]["duration"])
+        assert 3.5 < duration < 4.5, f"Unexpected duration={duration}; streams={[(s.get('codec_type'),s.get('duration')) for s in metadata['streams']]}"
         assert {item["codec_type"] for item in metadata["streams"]} == {"video", "audio"}
         print("PASS: animated captions + original soundtrack + moving stock + real MP4 audio/video")
         print("PASS: smoke test uses no credentials, network requests or YouTube upload")
