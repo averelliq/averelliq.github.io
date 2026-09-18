@@ -1,0 +1,44 @@
+name: Three Distinct Global Shorts Preflight (No Upload)
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/three-topics-preflight-20260918.yml
+permissions:
+  contents: read
+jobs:
+  inspect-three-storyboards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install only lightweight illustration dependencies
+        run: python -m pip install pillow requests soundfile numpy
+      - name: Syntax, uniqueness, narration and all 24 illustrated scenes
+        run: |
+          python -m py_compile shorts_bot/diagram_shorts.py shorts_bot/three_topics_20260918.py
+          PYTHONPATH=shorts_bot python - <<'PY'
+          import hashlib, tempfile
+          from pathlib import Path
+          from PIL import Image
+          import three_topics_20260918 as t
+          t.validate()
+          assert len({p['slug'] for p in t.PLANS})==3
+          assert len({p['title'] for p in t.PLANS})==3
+          with tempfile.TemporaryDirectory() as folder:
+              root=Path(folder)
+              poster_hashes=[]
+              for plan in t.PLANS:
+                  for n in range(8):
+                      image=t.poster(plan,n,root)
+                      with Image.open(image) as im:
+                          assert im.size==(720,1280)
+                          assert im.getbbox() is not None
+                      poster_hashes.append(hashlib.sha256(image.read_bytes()).hexdigest())
+              assert len(set(poster_hashes))==24, 'Illustrated scenes are duplicated'
+          print('PASS: three distinct English topics, 24 original 720x1280 storyboards and valid narration')
+          print('PASS: no YouTube credentials used or video uploaded')
+          PY
