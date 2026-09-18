@@ -8,8 +8,10 @@ on:
 permissions:
   contents: read
 
+# A pending run in a shared GitHub Actions concurrency group may be superseded.
+# The previous soda run had NO jobs and was cancelled, so this is its sole execution.
 concurrency:
-  group: global-shorts-bot
+  group: original-everyday-soda-20260918
   cancel-in-progress: false
 
 jobs:
