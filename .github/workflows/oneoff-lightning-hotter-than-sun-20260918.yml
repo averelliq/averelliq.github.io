@@ -81,3 +81,6 @@ jobs:
             shorts_bot/one_lightning_work_20260918/captions.ass
           if-no-files-found: ignore
           retention-days: 5
+
+# Confirmed previous run stopped at scene-three preview; it never reached YouTube.
+# This is a new isolated execution with unusable stock previews skipped, not approved.
