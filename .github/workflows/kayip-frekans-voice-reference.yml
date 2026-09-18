@@ -1,0 +1,50 @@
+name: KAYIP FREKANS - SES REFERANSI YENILEME
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: kf-reference-voice-renewal
+  cancel-in-progress: true
+jobs:
+  voice-preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    env:
+      # Private transport fragments of the full 44-second reference.
+      KF_REF_OPUS_B64_1: ${{ secrets.KF_REF_OPUS_B64_1 }}
+      KF_REF_OPUS_B64_2: ${{ secrets.KF_REF_OPUS_B64_2 }}
+      KF_REF_OPUS_B64_3: ${{ secrets.KF_REF_OPUS_B64_3 }}
+      HF_HUB_DISABLE_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify private complete reference is available
+        run: |
+          if [[ -z "$KF_REF_OPUS_B64_1" || -z "$KF_REF_OPUS_B64_2" || -z "$KF_REF_OPUS_B64_3" ]]; then
+            echo '::error::Full private voice reference is unavailable; no public or unrelated voice substituted.'
+            exit 1
+          fi
+      - name: Install CPU voice audition dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0 torchaudio==2.6.0
+          pip install chatterbox-tts==0.1.7 soundfile
+      - name: Regenerate private-reference Turkish voice auditions, not publication
+        timeout-minutes: 75
+        run: python -u kayip_frekans/voice_preview_v6.py --output output/voice-audition
+      - name: Save reference candidates only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KAYIP-FREKANS-V6-REFERANS-SES-TESTI
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: warn
+          path: |
+            output/voice-audition/serkan-v6-*.wav
+            output/voice-audition/voice_audition_v6.json
