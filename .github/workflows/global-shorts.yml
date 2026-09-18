@@ -43,8 +43,8 @@ jobs:
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
       YT_DATA_API_KEY: ${{ secrets.YT_DATA_API_KEY }}
       YOUTUBE_PRIVACY: public
-      GEMINI_MODEL: gemini-3.5-flash-lite
-      GEMINI_FALLBACK_MODELS: gemini-2.5-flash,gemini-2.5-flash-lite
+      GEMINI_MODEL: gemini-2.5-flash
+      GEMINI_FALLBACK_MODELS: gemini-2.5-flash-lite
       TTS_VOICE: am_michael
       SHORTS_THEME: ${{ inputs.theme || 'auto' }}
       SHORTS_AI_REVIEW: '1'
@@ -84,7 +84,7 @@ jobs:
 
       - name: Preflight checks
         run: |
-          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py shorts_bot/selection_guard.py shorts_bot/visual_guard.py shorts_bot/trend_ideas.py shorts_bot/quality_entry.py shorts_bot/montage_fx.py shorts_bot/montage_entry.py
+          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py shorts_bot/selection_guard.py shorts_bot/visual_guard.py shorts_bot/live_action_guard.py shorts_bot/trend_ideas.py shorts_bot/quality_entry.py shorts_bot/montage_fx.py shorts_bot/montage_entry.py
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
           python - <<'PY'
@@ -93,7 +93,7 @@ jobs:
           print('Python imports OK')
           PY
 
-      - name: Generate, review and upload enhanced Short
+      - name: Generate, verify REAL live-action footage and upload enhanced Short
         run: python shorts_bot/montage_entry.py
 
       - name: Save generated Short for debugging
