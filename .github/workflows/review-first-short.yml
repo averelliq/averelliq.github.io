@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 55
     env:
+      GITHUB_TOKEN: ${{ github.token }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
@@ -69,6 +70,7 @@ jobs:
           assert request['topic'] == 'how an espresso machine brews coffee'
           assert request['publish'] is False
           assert os.environ['SHORTS_SKIP_UPLOAD'] == '1'
+          assert os.environ.get('GITHUB_TOKEN')
           print('PREVIEW ONLY: YouTube publishing disabled until MP4 is reviewed.', flush=True)
           PY
       - name: Generate and quality-check the first video without uploading
