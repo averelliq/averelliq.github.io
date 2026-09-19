@@ -8,16 +8,22 @@ import hd_footage_guard
 import live_action_guard
 import quality_entry
 import montage_fx
+import resilient_plan_guard
 import safe_captions
+import stock_recovery
 import us_trends
 
 
 def main() -> None:
     editorial_upgrade.install()
     us_trends.install()
+    # Retry malformed scripts; never turn a negative review into approval.
+    resilient_plan_guard.install()
     gemini_transient_guard.install()
     # Reject low resolution stock sources even if upscaling could make a 1080p file.
     hd_footage_guard.install()
+    # Every additional stock candidate must pass the same independent reviews.
+    stock_recovery.install()
     # Only genuine camera footage; failed reviews mean NO publication.
     live_action_guard.install()
     safe_captions.install()
