@@ -112,4 +112,9 @@ def install() -> None:
     upgrade.choose_topic = choose
     upgrade.model_json = model
     upgrade.validate_plan = validate
+    # quality_entry imported before install() caches the *unwrapped* model.
+    # Its plan retries must call the editorial wrapper rather than silently
+    # bypassing the detailed brief. Preserve the original review and QC gates.
+    import quality_entry
+    quality_entry._original_model_json = model
     _installed = True
