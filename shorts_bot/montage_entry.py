@@ -19,6 +19,15 @@ def main() -> None:
     live_action_guard.install()
     safe_captions.install()
     creator_guard.install()
+    # Also enforce final metadata on previews, not just public uploads.
+    previous_validate = quality_entry.upgrade.validate_plan
+
+    def validate_with_metadata(plan, theme):
+        approved = previous_validate(plan, theme)
+        creator_guard.metadata(approved)
+        return approved
+
+    quality_entry.upgrade.validate_plan = validate_with_metadata
     state = montage_fx.install(quality_entry)
     quality_entry.upgrade.main()
     print(
