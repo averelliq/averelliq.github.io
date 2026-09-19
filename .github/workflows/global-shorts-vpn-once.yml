@@ -45,10 +45,10 @@ jobs:
       GEMINI_MODEL: gemini-3.5-flash-lite
       GEMINI_FALLBACK_MODELS: gemini-3.5-flash,gemini-3.6-flash
       TTS_VOICE: am_michael
-      SHORTS_THEME: ${{ inputs.theme || 'auto' }}
+      SHORTS_THEME: ${{ github.event_name == 'push' && 'everyday' || (inputs.theme || 'auto') }}
       SHORTS_AI_REVIEW: '1'
-      SHORTS_TREND_MODE: auto
-      SHORTS_US_TRENDS: '1'
+      SHORTS_TREND_MODE: 'off'
+      SHORTS_US_TRENDS: '0'
       SHORTS_MAX_VISUAL_CANDIDATES: '9'
       SHORTS_MUSIC: '1'
       SHORTS_MUSIC_GAIN: '0.20'
