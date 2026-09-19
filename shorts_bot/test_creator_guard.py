@@ -1,4 +1,4 @@
-"""Offline regression checks for Shorts metadata, HD sources and upload idempotency."""
+"""Offline regression checks for Shorts metadata, Full HD sources and idempotency."""
 from __future__ import annotations
 
 import os
@@ -56,15 +56,24 @@ class CreatorGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "8-52"):
             guard.metadata(plan)
 
-    def test_low_resolution_source_rejected(self):
+    def test_only_full_hd_and_higher_source_accepted(self):
         clips = {"video_files": [
             {"width": 360, "height": 720, "link": "https://example.com/poor.mp4"},
-            {"width": 1080, "height": 1920, "link": "https://example.com/hd.mp4"},
-            {"width": 720, "height": 1280, "link": "https://example.com/hd2.mp4"},
+            {"width": 1080, "height": 1920, "link": "https://example.com/fhd.mp4"},
+            {"width": 720, "height": 1280, "link": "https://example.com/hd.mp4"},
+            {"width": 2160, "height": 3840, "link": "https://example.com/4k.mp4"},
         ]}
         result = hd_footage_guard.hd_file_options(clips)
-        self.assertEqual(result, ["https://example.com/hd.mp4", "https://example.com/hd2.mp4"])
+        self.assertEqual(result, ["https://example.com/fhd.mp4", "https://example.com/4k.mp4"])
         self.assertNotIn("https://example.com/poor.mp4", result)
+        self.assertNotIn("https://example.com/hd.mp4", result)
+
+    def test_low_resolution_only_has_no_fallback(self):
+        clips = {"video_files": [
+            {"width": 720, "height": 1280, "link": "https://example.com/hd.mp4"},
+            {"width": 1080, "height": 1080, "link": "https://example.com/square.mp4"},
+        ]}
+        self.assertEqual(hd_footage_guard.hd_file_options(clips), [])
 
 
 if __name__ == "__main__":
