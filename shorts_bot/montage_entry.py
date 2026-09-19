@@ -1,8 +1,9 @@
-"""Enhanced scheduled Shorts with originality, licensed HD footage and final QC."""
+"""Original cloud Shorts: verify HD filmed footage before writing narration."""
 from __future__ import annotations
 
 import creator_guard
 import editorial_upgrade
+import footage_first
 import gemini_transient_guard
 import hd_footage_guard
 import live_action_guard
@@ -37,6 +38,9 @@ def main() -> None:
         return approved
 
     quality_entry.upgrade.validate_plan = validate_with_metadata
+    # Search, download, crop and independently inspect footage BEFORE script.
+    # Preserve the existing scene-by-scene and final upload-blocking QC gates.
+    footage_first.install()
     state = montage_fx.install(quality_entry)
     quality_entry.upgrade.main()
     print(
@@ -44,7 +48,7 @@ def main() -> None:
         f"motion_clips={state['motion_clips']}, "
         f"animated_captions={state['animated_captions']}, "
         f"original_music={state['original_music']}, "
-        "real_footage=True, HD_source=True, original_script=True, "
+        "footage_first=True, real_footage=True, HD_source=True, original_script=True, "
         "short_titles=True, hashtags_in_description=False, duplicate_guard=True",
         flush=True,
     )
