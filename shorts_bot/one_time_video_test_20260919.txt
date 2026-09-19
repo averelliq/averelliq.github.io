@@ -1,5 +1,5 @@
-One-time user-authorized test of the production Global Shorts bot.
-Create one original English curiosity Short from the current main branch.
-Upload publicly only if the script, licensed Full HD footage, narration and final-video checks all pass.
-Do not bypass YouTube's required synthetic-media disclosure.
-Request ID: global-shorts-one-time-test-20260919-01
+One-time user-authorized second test of the production Global Shorts bot.
+Create one original English Short specifically about why ice cream melts on a hot day.
+Upload publicly only if the original script, relevant real Full HD portrait stock footage, narration and final-video quality checks all pass.
+Never retry an ambiguous or successful YouTube upload. Do not bypass required synthetic-media disclosure.
+Request ID: global-shorts-one-time-test-20260919-02
