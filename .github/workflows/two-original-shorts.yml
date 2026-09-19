@@ -1,0 +1,96 @@
+name: Two Original Footage-First Shorts
+
+on:
+  push:
+    paths:
+      - 'shorts_bot/two_shorts_request.json'
+
+permissions:
+  contents: write
+
+# Do not overlap the channel's regular scheduled uploads or history reservations.
+concurrency:
+  group: global-shorts-bot
+  cancel-in-progress: false
+
+jobs:
+  produce-two:
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - slot: '01'
+            theme: everyday
+          - slot: '02'
+            theme: history
+    name: original-short-${{ matrix.slot }}-${{ matrix.theme }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+      YT_DATA_API_KEY: ${{ secrets.YT_DATA_API_KEY }}
+      YOUTUBE_PRIVACY: public
+      GEMINI_MODEL: gemini-3.5-flash-lite
+      GEMINI_FALLBACK_MODELS: gemini-3.5-flash,gemini-3.6-flash
+      TTS_VOICE: am_michael
+      SHORTS_THEME: ${{ matrix.theme }}
+      SHORTS_AI_REVIEW: '1'
+      SHORTS_TREND_MODE: 'off'
+      SHORTS_US_TRENDS: '0'
+      SHORTS_MAX_VISUAL_CANDIDATES: '9'
+      SHORTS_MUSIC: '1'
+      SHORTS_MUSIC_GAIN: '0.20'
+      SHORTS_SKIP_UPLOAD: '0'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: shorts_bot/requirements.txt
+      - name: Cache voice model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: kokoro-${{ runner.os }}-v1
+      - name: Install FFmpeg and voice dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg espeak-ng libsndfile1
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r shorts_bot/requirements.txt
+          pip check
+      - name: Preflight and request validation
+        run: |
+          python -m compileall -q shorts_bot
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          request = json.loads(Path('shorts_bot/two_shorts_request.json').read_text(encoding='utf-8'))
+          assert request['count'] == 2 and request['privacy'] == 'public'
+          assert request['themes'] == ['everyday', 'history']
+          print('Two independently quality-gated Shorts requested; no duplicate uploads.', flush=True)
+          PY
+      - name: Discover HD footage first, create original Short and publish if QC passes
+        run: python shorts_bot/montage_entry.py
+      - name: Save media and evidence for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: two-original-shorts-${{ matrix.slot }}-${{ github.run_id }}
+          path: |
+            shorts_bot/output/short.mp4
+            shorts_bot/output/plan.json
+            shorts_bot/output/visual_sources.json
+          if-no-files-found: ignore
+          retention-days: 3
