@@ -1,11 +1,14 @@
-name: Shorts Montage Smoke Test (No Upload)
+name: Shorts Quality Regression (No Upload)
 
 on:
   workflow_dispatch:
   push:
     paths:
       - 'shorts_bot/test_montage_fx.py'
+      - 'shorts_bot/test_creator_guard.py'
+      - 'shorts_bot/creator_guard.py'
       - 'shorts_bot/montage_fx.py'
+      - 'shorts_bot/montage_entry.py'
       - '.github/workflows/montage-smoke.yml'
 
 permissions:
@@ -14,18 +17,20 @@ permissions:
 jobs:
   offline-render-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install ffmpeg and lightweight test requirements
+      - name: Install offline test dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
-          python -m pip install 'numpy==2.4.6'
-      - name: Assert syntax
-        run: python -m py_compile shorts_bot/montage_fx.py shorts_bot/montage_entry.py shorts_bot/test_montage_fx.py
-      - name: Test audio/video montage without credentials or uploads
+          python -m pip install 'numpy==2.4.6' requests soundfile
+      - name: Check production syntax
+        run: python -m py_compile shorts_bot/main.py shorts_bot/upgrade.py shorts_bot/editorial_upgrade.py shorts_bot/quality_entry.py shorts_bot/montage_fx.py shorts_bot/montage_entry.py shorts_bot/creator_guard.py shorts_bot/test_montage_fx.py shorts_bot/test_creator_guard.py
+      - name: Test original Short metadata and cross-run duplicate protection
+        run: python shorts_bot/test_creator_guard.py
+      - name: Test caption, audio and video montage without credentials or uploading
         run: python shorts_bot/test_montage_fx.py
