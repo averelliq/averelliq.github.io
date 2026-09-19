@@ -58,9 +58,9 @@ EXTRA_TOPICS = {
 }
 
 POLICY = """
-CHANNEL BRAND: Everyday mysteries explained in 30 seconds. Broad English-language curiosity: nature, animals, space, psychology/perception, technology, history, everyday objects, and surprising but verifiable science.
-Aim for 25-35 seconds and 65-80 words, with the opening observation/action in the FIRST 2 SECONDS. No logo, greetings, introductions or generic setup. Show the precise promised subject immediately and match EACH next visual to its sentence; prefer filmed real-world shots, never vector art, slideshow, AI illustrations, fake demonstrations, or generic filler. Keep changes every 3-5 seconds when usable distinct footage exists. Exactly ONE main question, a true satisfying explanation, and a natural one-line CTA only AFTER the answer, near the end: 'One new mystery every day. Subscribe for more.' Do not invent a numerical series episode. Identify the format in description as 'Everyday Mysteries'.
-Originality: you MAY take the abstract educational topic from recent YouTube metadata, but NEVER reproduce a video's title, script, footage, audio, thumbnail, distinctive creative presentation, or scene order. Write fresh original narration. A popular video title is NOT scientific evidence; reject unverified, misleading or sensational claims. For unavailable footage, the existing fail-closed video gate must cancel publication. Return exactly the JSON shape already requested.
+CHANNEL BRAND: Everyday mysteries explained in 30 seconds. Broad English-language curiosity: nature, animals, space, technology, history, everyday objects, and surprising but verifiable science.
+Write EXACTLY EIGHT scenes with 9-11 natural spoken words in EACH scene (72-88 words overall). The first sentence of the first scene must be a concrete, surprising, 7-9-word sentence ending in a period or question mark, with no introduction; show that observation in the first two seconds. Each following scene progresses logically toward one truthful explanation and matches available real-world footage. Give every scene one distinct 2-5-word Pexels search query and exactly two 2-5-word backup queries showing THAT SAME TOPIC; no fake demonstrations, generic filler, vector art, slide shows, AI illustrations or borrowed footage. Avoid invisible internal anatomy, microscopic processes and unfilmable historic recreations; describe the process while showing a visibly related real-world subject instead of pretending footage directly depicts an invisible process.
+Exactly ONE main question, a satisfying true explanation and a short natural subscription invitation ONLY AFTER the answer in the last scene, such as 'Subscribe for more.' Preserve the precise video subject through every scene. No unrelated example objects or separate topics. Title includes #Shorts; description includes 'Everyday Mysteries'. Do not invent numerical episodes, unsupported facts or statistics. An original educational topic may come from public trending-video metadata, but never reproduce another video's title, script, footage, audio, thumbnail, distinctive presentation or scene order. A trending title is NOT scientific evidence. The existing fail-closed visual gate must cancel publication if suitable filmed footage cannot be found. Return exactly the JSON shape already requested.
 """
 
 _installed = False
@@ -87,7 +87,6 @@ def install() -> None:
     def validate(plan, theme):
         result = previous_validate(plan, theme)
         words = len(result["narration"].split())
-        # Reject overly long output rather than silently speeding up narration.
         if words > 90:
             raise ValueError("Short exceeds 90 spoken words; rewrite for 25-35 seconds")
         opening = re.split(r"[.!?]", result["scenes"][0]["voiceover"], 1)[0]
