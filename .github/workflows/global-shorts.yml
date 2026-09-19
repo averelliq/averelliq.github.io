@@ -19,9 +19,8 @@ on:
           - everyday
         default: auto
   schedule:
-    # Candidate UTC crons. The cheap gate below accepts ONLY US Eastern
-    # 16:15, 19:15 and 22:15, accounting for US daylight saving time.
-    # Pacific: 13:15, 16:15 and 19:15. No local machine required.
+    # Candidate UTC crons. Gate accepts US Eastern 16:15, 19:15 and 22:15,
+    # accounting for US daylight saving time. No local computer is required.
     - cron: "15 20 * * *"
     - cron: "15 21 * * *"
     - cron: "15 23 * * *"
@@ -30,7 +29,7 @@ on:
     - cron: "15 3 * * *"
 
 permissions:
-  contents: read
+  contents: write  # Durable unique-topic reservations prevent repeat uploads.
 
 concurrency:
   group: global-shorts-bot
@@ -67,8 +66,6 @@ jobs:
               if len(fields) != 5 or fields[0] != '15' or not fields[1].isdigit():
                   raise ValueError('Unexpected scheduled cron; no video published')
               now = datetime.now(timezone.utc)
-              # GitHub Actions scheduled jobs can start late; evaluate the
-              # scheduled UTC instant, NOT the runner's late start minute.
               scheduled = now.replace(hour=int(fields[1]), minute=15, second=0, microsecond=0)
               if scheduled > now + timedelta(minutes=2):
                   scheduled -= timedelta(days=1)
@@ -85,6 +82,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
+      GITHUB_TOKEN: ${{ github.token }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
@@ -134,7 +132,7 @@ jobs:
 
       - name: Preflight checks
         run: |
-          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py shorts_bot/editorial_upgrade.py shorts_bot/selection_guard.py shorts_bot/visual_guard.py shorts_bot/live_action_guard.py shorts_bot/trend_ideas.py shorts_bot/us_trends.py shorts_bot/us_window.py shorts_bot/quality_entry.py shorts_bot/montage_fx.py shorts_bot/montage_entry.py shorts_bot/gemini_transient_guard.py
+          python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py shorts_bot/editorial_upgrade.py shorts_bot/selection_guard.py shorts_bot/visual_guard.py shorts_bot/live_action_guard.py shorts_bot/trend_ideas.py shorts_bot/us_trends.py shorts_bot/us_window.py shorts_bot/quality_entry.py shorts_bot/montage_fx.py shorts_bot/montage_entry.py shorts_bot/gemini_transient_guard.py shorts_bot/creator_guard.py
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
           python - <<'PY'
@@ -143,7 +141,7 @@ jobs:
           print('Python imports OK')
           PY
 
-      - name: Generate, verify REAL live-action footage and upload enhanced US-focused Short
+      - name: Generate, verify genuine live-action scenes, check originality and upload Short
         run: python shorts_bot/montage_entry.py
 
       - name: Save generated Short for debugging
