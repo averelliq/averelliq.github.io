@@ -59,9 +59,16 @@ EXTRA_TOPICS = {
 
 POLICY = """
 CHANNEL BRAND: Everyday mysteries explained in 30 seconds. Broad English-language curiosity: nature, animals, space, technology, history, everyday objects, and surprising but verifiable science.
-Write EXACTLY EIGHT scenes with 9-11 natural spoken words in EACH scene (72-88 words overall). The first sentence of the first scene must be a concrete, surprising, 7-9-word sentence ending in a period or question mark, with no introduction; show that observation in the first two seconds. Each following scene progresses logically toward one truthful explanation and matches available real-world footage. Give every scene one distinct 2-5-word Pexels search query and exactly two 2-5-word backup queries showing THAT SAME TOPIC; no fake demonstrations, generic filler, vector art, slide shows, AI illustrations or borrowed footage. Avoid invisible internal anatomy, microscopic processes and unfilmable historic recreations; describe the process while showing a visibly related real-world subject instead of pretending footage directly depicts an invisible process.
+Write EXACTLY EIGHT scenes with 9-11 natural spoken words in EACH scene (72-88 words overall). The first sentence of the first scene must be a concrete, surprising, 7-9-word sentence ending in a period or question mark, with no introduction; show that observation in the first two seconds. Each following scene progresses logically toward one truthful explanation and matches available real-world footage. Give every scene one distinct 2-5-word Pexels search query and exactly two 2-5-word backup queries showing THAT SAME TOPIC; no fake demonstrations, generic filler, vector art, slide shows, AI illustrations or borrowed footage.
+ABSOLUTE VISUAL RULE: EVERY spoken sentence must describe a directly filmable real-world subject or observable effect. Explain science using visible observations (e.g. for ice cream, a scoop warms, softens, loses its shape, drips). NEVER mention crystal structures, microscopic structures, molecules, atoms, lattices, molecular bonds, chemical bonds, invisible internal anatomy, or any process stock footage cannot directly show. No scene may claim stock footage displays such invisible phenomena. Choose a simpler truthful explanation instead; do not fabricate demonstrations. Filmable historical recreations only if real authentic relevant footage exists.
 Exactly ONE main question, a satisfying true explanation and a short natural subscription invitation ONLY AFTER the answer in the last scene, such as 'Subscribe for more.' Preserve the precise video subject through every scene. No unrelated example objects or separate topics. Title includes #Shorts; description includes 'Everyday Mysteries'. Do not invent numerical episodes, unsupported facts or statistics. An original educational topic may come from public trending-video metadata, but never reproduce another video's title, script, footage, audio, thumbnail, distinctive presentation or scene order. A trending title is NOT scientific evidence. The existing fail-closed visual gate must cancel publication if suitable filmed footage cannot be found. Return exactly the JSON shape already requested.
 """
+
+UNFILMABLE = re.compile(
+    r"\b(?:crystal structures?|ice crystals?|microscopic|molecular|molecules?|atoms?|"
+    r"lattices?|lattice|chemical bonds?|molecular bonds?|cellular structures?|"
+    r"inside the molecules?|locked structures?)\b", re.I
+)
 
 _installed = False
 
@@ -89,6 +96,14 @@ def install() -> None:
         words = len(result["narration"].split())
         if words > 90:
             raise ValueError("Short exceeds 90 spoken words; rewrite for 25-35 seconds")
+        for number, scene in enumerate(result["scenes"], start=1):
+            narration = str(scene.get("voiceover", ""))
+            if UNFILMABLE.search(narration):
+                raise ValueError(
+                    f"Scene {number} narrates unfilmable microscopic phenomena; "
+                    "replace with a scientifically accurate, visible effect like "
+                    "heating, softening, dripping or an observable action"
+                )
         opening = re.split(r"[.!?]", result["scenes"][0]["voiceover"], 1)[0]
         if len(opening.split()) > 10:
             raise ValueError("Start with a concise first-two-second curiosity hook")
@@ -112,9 +127,8 @@ def install() -> None:
     upgrade.choose_topic = choose
     upgrade.model_json = model
     upgrade.validate_plan = validate
-    # quality_entry imported before install() caches the *unwrapped* model.
-    # Its plan retries must call the editorial wrapper rather than silently
-    # bypassing the detailed brief. Preserve the original review and QC gates.
+    # The quality retry wrapper captures the unwrapped model before install().
+    # Propagate this editorial brief without disabling any existing quality gate.
     import quality_entry
     quality_entry._original_model_json = model
     _installed = True
