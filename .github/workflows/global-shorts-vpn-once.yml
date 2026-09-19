@@ -136,3 +136,5 @@ jobs:
             shorts_bot/output/visual_sources.json
           if-no-files-found: ignore
           retention-days: 3
+
+# One user-authorized retry after repairing editorial prompt propagation; publish at most once.
