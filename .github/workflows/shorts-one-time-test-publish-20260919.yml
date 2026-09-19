@@ -31,8 +31,8 @@ jobs:
       TTS_VOICE: am_michael
       SHORTS_THEME: everyday
       SHORTS_AI_REVIEW: '1'
-      SHORTS_TREND_MODE: auto
-      SHORTS_US_TRENDS: '1'
+      SHORTS_TREND_MODE: 'off'
+      SHORTS_US_TRENDS: '0'
       SHORTS_MAX_VISUAL_CANDIDATES: '9'
       SHORTS_MUSIC: '1'
       SHORTS_MUSIC_GAIN: '0.20'
@@ -65,8 +65,17 @@ jobs:
           python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py shorts_bot/editorial_upgrade.py shorts_bot/selection_guard.py shorts_bot/visual_guard.py shorts_bot/live_action_guard.py shorts_bot/trend_ideas.py shorts_bot/us_trends.py shorts_bot/us_window.py shorts_bot/quality_entry.py shorts_bot/montage_fx.py shorts_bot/montage_entry.py shorts_bot/gemini_transient_guard.py shorts_bot/creator_guard.py shorts_bot/hd_footage_guard.py
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
-      - name: Create original Short, inspect footage, and upload once if all checks pass
-        run: python shorts_bot/montage_entry.py
+      - name: Create an original ice-cream curiosity Short, validate all scenes and upload once
+        run: |
+          PYTHONPATH=shorts_bot python - <<'PY'
+          import us_trends
+          # This explicit one-off test avoids transient sports headlines and uses
+          # a visually demonstrable subject; all original-script, HD footage,
+          # factual-review, quality and single-upload checks remain mandatory.
+          us_trends._evergreen = lambda theme: 'why ice cream melts on a hot day'
+          import montage_entry
+          montage_entry.main()
+          PY
       - name: Retain video and plan for review (three days)
         if: always()
         uses: actions/upload-artifact@v4
