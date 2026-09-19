@@ -1,7 +1,6 @@
-"""Run one explicitly requested Short with a fixed, independently selected topic.
+"""One requested Short: pin the topic and insist on relevant candle-only footage.
 
-This entrypoint only runs from the dedicated GitHub push workflow. It reuses
-all existing editorial, footage, render, duplicate, and upload quality gates.
+All scheduled Shorts and every editorial, stock and final QC gate stay intact.
 """
 from __future__ import annotations
 
@@ -10,10 +9,28 @@ import os
 import re
 from pathlib import Path
 
+import editorial_upgrade
 import montage_entry
+import quality_entry
 import trend_ideas
 
 REQUEST = Path(__file__).with_name("one_off_request.json")
+CANDLE_QUERIES = (
+    "candle flame flickering closeup",
+    "single candle flame dark",
+    "lit candle flame flickering",
+    "candle wick burning flame",
+    "candle flame slow motion",
+    "small candle burning closeup",
+    "yellow candle flame closeup",
+    "candle flame moving closeup",
+)
+CANDLE_BACKUPS = (
+    "candle flame flickering",
+    "burning candle close up",
+    "candle wick flame",
+    "single candle burning",
+)
 
 
 def main() -> None:
@@ -34,9 +51,19 @@ def main() -> None:
     if topic != "why a candle flame flickers" or not re.fullmatch(r"[a-z ]{8,90}", topic):
         raise ValueError("Unexpected one-off topic")
 
-    # us_trends.install normally replaces the topic picker. Install it first,
-    # then pin only this run's subject so both plan creation and validation
-    # agree. This does not alter the code used by scheduled publications.
+    # Observations of the visible flame explain the airflow. Never illustrate
+    # the word 'hot air' with balloons or landscape footage.
+    editorial_upgrade.POLICY += (
+        "\nONE-OFF CANDLE VISUAL BRIEF: Every scene shows a real, visibly burning "
+        "candle or its visibly moving flame and wick in close-up. Never request "
+        "or describe balloons, landscapes, windmills, unrelated fire, invisible "
+        "air visualizations or simulated footage. The observable flicker of "
+        "the actual candle flame is evidence of changing air movement. "
+        "All eight scenes need distinct, genuine filmed candle clips.\n"
+    )
+
+    # Pin only this run's subject AFTER the US picker installs. This ensures
+    # the topic stays identical in generation, review and duplicate checking.
     original_install = montage_entry.us_trends.install
 
     def install_and_pin() -> None:
@@ -46,6 +73,24 @@ def main() -> None:
         trend_ideas.pick_topic = lambda theme, fallback, model_json: topic
 
     montage_entry.us_trends.install = install_and_pin
+
+    # The first production attempt chose 'hot air' search terms and received
+    # hot-air balloons. Make EVERY query explicitly about a candle flame, while
+    # keeping independent frame-level visual review and duplicate rejection.
+    previous_plan = quality_entry.upgrade.generate_plan
+
+    def candle_specific_plan():
+        plan = previous_plan()
+        for index, scene in enumerate(plan["scenes"]):
+            scene["query"] = CANDLE_QUERIES[index % len(CANDLE_QUERIES)]
+            scene["backup_queries"] = [
+                CANDLE_BACKUPS[(index * 2) % len(CANDLE_BACKUPS)],
+                CANDLE_BACKUPS[(index * 2 + 1) % len(CANDLE_BACKUPS)],
+            ]
+        print("ONE-OFF FOOTAGE SEARCH: candle-specific camera footage only", flush=True)
+        return plan
+
+    quality_entry.upgrade.generate_plan = candle_specific_plan
     print(f"ONE-OFF ORIGINAL SHORT: {topic}", flush=True)
     montage_entry.main()
 
