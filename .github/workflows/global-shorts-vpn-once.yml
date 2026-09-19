@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
-      VPN_WG_CONFIG_B64: ${{ secrets.SHORTS_WG_CONFIG_B64 }}
+      VPN_WG_CONFIG: ${{ secrets.SHORTS_WG_CONFIG }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
@@ -48,8 +48,8 @@ jobs:
     steps:
       - name: Require configured VPN before any generation or upload
         run: |
-          if [ -z "$VPN_WG_CONFIG_B64" ]; then
-            echo 'VPN not configured: add a trusted WireGuard profile as GitHub Actions secret SHORTS_WG_CONFIG_B64 (base64 of the full .conf file). No video will be generated or uploaded.' >&2
+          if [ -z "$VPN_WG_CONFIG" ]; then
+            echo 'VPN not configured: add a trusted WireGuard .conf profile as encrypted GitHub Actions secret SHORTS_WG_CONFIG. No video will be generated or uploaded.' >&2
             exit 1
           fi
 
@@ -68,7 +68,7 @@ jobs:
           umask 077
           before="$(curl -4fsS --max-time 20 https://api.ipify.org)"
           sudo install -d -m 700 /etc/wireguard
-          printf '%s' "$VPN_WG_CONFIG_B64" | base64 --decode | sudo tee /etc/wireguard/wgshorts.conf >/dev/null
+          printf '%s\n' "$VPN_WG_CONFIG" | sudo tee /etc/wireguard/wgshorts.conf >/dev/null
           sudo chmod 600 /etc/wireguard/wgshorts.conf
           if ! sudo grep -Eq '^[[:space:]]*AllowedIPs[[:space:]]*=[[:space:]]*0\.0\.0\.0/0' /etc/wireguard/wgshorts.conf; then
             echo 'A full IPv4 tunnel (AllowedIPs = 0.0.0.0/0) is required. Upload cancelled.' >&2
