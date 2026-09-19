@@ -65,14 +65,32 @@ jobs:
           python -m py_compile shorts_bot/main.py shorts_bot/retry_runner.py shorts_bot/upgrade.py shorts_bot/editorial_upgrade.py shorts_bot/selection_guard.py shorts_bot/visual_guard.py shorts_bot/live_action_guard.py shorts_bot/trend_ideas.py shorts_bot/us_trends.py shorts_bot/us_window.py shorts_bot/quality_entry.py shorts_bot/montage_fx.py shorts_bot/montage_entry.py shorts_bot/gemini_transient_guard.py shorts_bot/creator_guard.py shorts_bot/hd_footage_guard.py
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
-      - name: Create an original ice-cream curiosity Short, validate all scenes and upload once
+      - name: Create original latte-art curiosity Short; upload only after full quality verification
         run: |
           PYTHONPATH=shorts_bot python - <<'PY'
           import us_trends
-          # This explicit one-off test avoids transient sports headlines and uses
-          # a visually demonstrable subject; all original-script, HD footage,
-          # factual-review, quality and single-upload checks remain mandatory.
-          us_trends._evergreen = lambda theme: 'why ice cream melts on a hot day'
+          import editorial_upgrade
+          # One-off editorial topic backed by numerous genuine Pexels vertical clips.
+          # All original-script, Full HD, real-camera, subject-match, narration,
+          # factual consistency and anti-duplicate publication checks remain on.
+          us_trends._evergreen = lambda theme: 'how a barista pours latte art into coffee'
+          editorial_upgrade.POLICY += '''
+          TEST-SPECIFIC VISUAL ACCURACY: Tell one truthful and specific story about
+          a barista pouring steamed milk into espresso to form latte art. Structure
+          eight distinct observations around the pour, movement of the milk and
+          gradual appearance of white foam shapes in the cup. All eight visuals
+          must be attainable using genuine vertical Pexels camera footage of
+          latte art pouring; never demand unseen milk temperatures, espresso
+          extraction, a particular cup color, a specific cafe location, or
+          distinct shapes (hearts, swans) when generic footage cannot prove them.
+          Stock search phrases can vary between: latte art pouring milk,
+          barista making latte art, milk pouring into coffee, latte foam coffee,
+          barista pouring latte, latte art close up, coffee milk pour,
+          barista coffee art. Avoid queries describing an action or object
+          missing from the narration. Each scene should truthfully describe
+          an actual visible step of latte-art milk pouring. Keep it engaging,
+          credible, and original, not eight interchangeable repetitions.
+          '''
           import montage_entry
           montage_entry.main()
           PY
