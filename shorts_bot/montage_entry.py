@@ -4,6 +4,7 @@ from __future__ import annotations
 import creator_guard
 import editorial_upgrade
 import footage_first
+import footage_review_fix
 import gemini_transient_guard
 import hd_footage_guard
 import live_action_guard
@@ -39,6 +40,8 @@ def main() -> None:
 
     quality_entry.upgrade.validate_plan = validate_with_metadata
     # Search, download, crop and independently inspect footage BEFORE script.
+    # Split Gemini's image-heavy JSON reviews into batches; never accept invalid replies.
+    footage_review_fix.install()
     # Preserve the existing scene-by-scene and final upload-blocking QC gates.
     footage_first.install()
     state = montage_fx.install(quality_entry)
