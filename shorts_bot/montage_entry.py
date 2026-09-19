@@ -1,6 +1,7 @@
-"""Enhanced scheduled Shorts with original US curiosity editorial and filmed scene QC."""
+"""Enhanced scheduled Shorts with originality, licensed footage and final QC."""
 from __future__ import annotations
 
+import creator_guard
 import editorial_upgrade
 import gemini_transient_guard
 import live_action_guard
@@ -14,9 +15,10 @@ def main() -> None:
     editorial_upgrade.install()
     us_trends.install()
     gemini_transient_guard.install()
-    # Reject slides, vector art and unrelated footage. Failed QC means no upload.
+    # Only genuine camera footage; failed reviews mean NO publication.
     live_action_guard.install()
     safe_captions.install()
+    creator_guard.install()
     state = montage_fx.install(quality_entry)
     quality_entry.upgrade.main()
     print(
@@ -24,7 +26,8 @@ def main() -> None:
         f"motion_clips={state['motion_clips']}, "
         f"animated_captions={state['animated_captions']}, "
         f"original_music={state['original_music']}, "
-        "real_footage=True, short_captions=True, original_US_topics=True",
+        "real_footage=True, original_script=True, short_titles=True, "
+        "hashtags_in_description=False, duplicate_guard=True",
         flush=True,
     )
 
