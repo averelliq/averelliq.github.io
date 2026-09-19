@@ -1,4 +1,4 @@
-"""Offline regression checks for Shorts metadata and upload idempotency."""
+"""Offline regression checks for Shorts metadata, HD sources and upload idempotency."""
 from __future__ import annotations
 
 import os
@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 import creator_guard as guard
+import hd_footage_guard
 
 
 class CreatorGuardTests(unittest.TestCase):
@@ -54,6 +55,16 @@ class CreatorGuardTests(unittest.TestCase):
         plan["title"] = "A" * 70
         with self.assertRaisesRegex(ValueError, "8-52"):
             guard.metadata(plan)
+
+    def test_low_resolution_source_rejected(self):
+        clips = {"video_files": [
+            {"width": 360, "height": 720, "link": "https://example.com/poor.mp4"},
+            {"width": 1080, "height": 1920, "link": "https://example.com/hd.mp4"},
+            {"width": 720, "height": 1280, "link": "https://example.com/hd2.mp4"},
+        ]}
+        result = hd_footage_guard.hd_file_options(clips)
+        self.assertEqual(result, ["https://example.com/hd.mp4", "https://example.com/hd2.mp4"])
+        self.assertNotIn("https://example.com/poor.mp4", result)
 
 
 if __name__ == "__main__":
