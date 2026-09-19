@@ -137,4 +137,4 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-# One user-authorized retry after repairing editorial prompt propagation; publish at most once.
+# One user-authorized run with a preflight rejecting unfilmable scientific narration.
