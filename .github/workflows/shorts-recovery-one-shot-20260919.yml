@@ -28,7 +28,7 @@ jobs:
       GEMINI_MODEL: gemini-3.5-flash-lite
       GEMINI_FALLBACK_MODELS: gemini-3.5-flash,gemini-3.6-flash
       TTS_VOICE: am_michael
-      SHORTS_THEME: science
+      SHORTS_THEME: everyday
       SHORTS_AI_REVIEW: '1'
       SHORTS_TREND_MODE: 'off'
       SHORTS_US_TRENDS: '0'
@@ -62,33 +62,40 @@ jobs:
       - name: Verify full production syntax
         run: |
           python -m py_compile shorts_bot/main.py shorts_bot/upgrade.py shorts_bot/editorial_upgrade.py shorts_bot/quality_entry.py shorts_bot/selection_guard.py shorts_bot/visual_guard.py shorts_bot/live_action_guard.py shorts_bot/creator_guard.py shorts_bot/resilient_plan_guard.py shorts_bot/stock_recovery.py shorts_bot/hd_footage_guard.py shorts_bot/montage_entry.py
-      - name: Produce one original beach-wave Short and publish only if all safeguards pass
+      - name: Make one original wave Short and publish only after complete verification
         run: |
           PYTHONPATH=shorts_bot python - <<'PY'
           import us_trends
           import editorial_upgrade
-          # A visibly filmable evergreen subject with a large real-camera stock pool.
-          us_trends._evergreen = lambda theme: 'how ocean waves curl and break on a sandy beach'
+          # Describe only moments visibly available in genuine Pexels beach footage.
+          us_trends._evergreen = lambda theme: 'how ocean waves roll onto the shore'
           editorial_upgrade.POLICY += '''
-          ONE-OFF TEST: The Short shows genuine filmed ocean waves rolling,
-          curling, breaking into visible white foam, washing onto sandy beach,
-          then receding. Each of eight scenes MUST describe a distinct observable
-          moment of that same event, with truthful narration. Use independently
-          written accessible English; do not claim any precise wave height,
-          measured speed, tidal cause, underwater seabed, invisible molecules,
-          surfing, swimmers, or a specific beach unless the clips show it.
-          Search genuine Pexels portrait footage using eight meaningfully varied
-          literal queries such as ocean wave breaking, waves sandy beach,
-          ocean surf foam, beach waves closeup, waves washing shore,
-          crashing waves sand, water retreating beach, ocean wave curling.
-          No generic unrelated pictures, AI footage, repeated stock ID or
-          repeated footage fingerprint. End with the true visible result,
-          then a natural short subscription invitation.
+          ONE-OFF VISUAL FEASIBILITY: Tell an original accurate accessible
+          English micro-story about an ocean wave rolling toward the shore,
+          visible white foam, and waves continuing to arrive. This is a
+          VISUAL-FIRST story: choose eight distinct broad observations which
+          genuine portrait real-camera footage of ocean surf or beach waves
+          can demonstrate. Describe wave movement, breaking and shore foam
+          only where those actions are available as filmed scenes; otherwise
+          describe an equally truthful visible wave observation. Do NOT demand
+          a curled overhanging crest, a slow-motion barrel, an underwater
+          view, rocky cliffs, a particular beach, precisely measured physics,
+          sand visibly moving underwater, a swimmer, or a specific wave shape.
+          Do not assert all eight shots show sand if they need not. Each shot
+          must visibly support its own narration; do not pass off boat wakes,
+          cliffs or calm flat water as shoreline breakers. Use three distinct
+          but broad exact stock search phrases per scene, such as ocean waves,
+          beach waves, shore foam, ocean surf, waves breaking, waves coastline,
+          waves beach closeup, wave movement; vary actual observations and
+          shots, not merely captions over recycled footage. Eight DIFFERENT
+          Pexels clips with no matching visual fingerprints are mandatory.
+          Start with an engaging true hook and finish with a natural concise
+          subscription invitation; no external URL, AI promotion or hashtag.
           '''
           import montage_entry
           montage_entry.main()
           PY
-      - name: Retain video and review evidence for three days
+      - name: Retain output for review three days
         if: always()
         uses: actions/upload-artifact@v4
         with:
