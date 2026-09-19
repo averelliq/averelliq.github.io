@@ -6,8 +6,11 @@ on:
     paths:
       - 'shorts_bot/test_montage_fx.py'
       - 'shorts_bot/test_creator_guard.py'
+      - 'shorts_bot/test_recovery.py'
       - 'shorts_bot/creator_guard.py'
       - 'shorts_bot/hd_footage_guard.py'
+      - 'shorts_bot/resilient_plan_guard.py'
+      - 'shorts_bot/stock_recovery.py'
       - 'shorts_bot/montage_fx.py'
       - 'shorts_bot/montage_entry.py'
       - '.github/workflows/montage-smoke.yml'
@@ -30,8 +33,10 @@ jobs:
           sudo apt-get install -y ffmpeg
           python -m pip install 'numpy==2.4.6' requests soundfile
       - name: Check production syntax
-        run: python -m py_compile shorts_bot/main.py shorts_bot/upgrade.py shorts_bot/editorial_upgrade.py shorts_bot/quality_entry.py shorts_bot/montage_fx.py shorts_bot/montage_entry.py shorts_bot/creator_guard.py shorts_bot/hd_footage_guard.py shorts_bot/test_montage_fx.py shorts_bot/test_creator_guard.py
+        run: python -m py_compile shorts_bot/main.py shorts_bot/upgrade.py shorts_bot/editorial_upgrade.py shorts_bot/quality_entry.py shorts_bot/montage_fx.py shorts_bot/montage_entry.py shorts_bot/creator_guard.py shorts_bot/hd_footage_guard.py shorts_bot/resilient_plan_guard.py shorts_bot/stock_recovery.py shorts_bot/test_montage_fx.py shorts_bot/test_creator_guard.py shorts_bot/test_recovery.py
       - name: Test original Short metadata, Full HD footage and cross-run duplicate protection
         run: python shorts_bot/test_creator_guard.py
+      - name: Test Gemini JSON recovery and additional stock pages
+        run: python shorts_bot/test_recovery.py
       - name: Test caption, audio and video montage without credentials or uploading
         run: python shorts_bot/test_montage_fx.py
