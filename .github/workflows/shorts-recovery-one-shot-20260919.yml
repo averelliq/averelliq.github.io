@@ -1,0 +1,101 @@
+name: One-Time Global Short After Recovery
+
+on:
+  push:
+    paths:
+      - 'shorts_bot/one_shot_recovery_20260919.txt'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: global-shorts-bot
+  cancel-in-progress: false
+
+jobs:
+  publish-one-quality-checked-short:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+      YOUTUBE_PRIVACY: public
+      GEMINI_MODEL: gemini-3.5-flash-lite
+      GEMINI_FALLBACK_MODELS: gemini-3.5-flash,gemini-3.6-flash
+      TTS_VOICE: am_michael
+      SHORTS_THEME: science
+      SHORTS_AI_REVIEW: '1'
+      SHORTS_TREND_MODE: 'off'
+      SHORTS_US_TRENDS: '0'
+      SHORTS_MAX_VISUAL_CANDIDATES: '9'
+      SHORTS_MUSIC: '1'
+      SHORTS_MUSIC_GAIN: '0.20'
+      SHORTS_SKIP_UPLOAD: '0'
+    steps:
+      - name: Checkout production bot
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: shorts_bot/requirements.txt
+      - name: Cache voice model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: kokoro-${{ runner.os }}-v1
+      - name: Install speech and video dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg espeak-ng libsndfile1
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r shorts_bot/requirements.txt
+          pip check
+      - name: Verify full production syntax
+        run: |
+          python -m py_compile shorts_bot/main.py shorts_bot/upgrade.py shorts_bot/editorial_upgrade.py shorts_bot/quality_entry.py shorts_bot/selection_guard.py shorts_bot/visual_guard.py shorts_bot/live_action_guard.py shorts_bot/creator_guard.py shorts_bot/resilient_plan_guard.py shorts_bot/stock_recovery.py shorts_bot/hd_footage_guard.py shorts_bot/montage_entry.py
+      - name: Produce one original beach-wave Short and publish only if all safeguards pass
+        run: |
+          PYTHONPATH=shorts_bot python - <<'PY'
+          import us_trends
+          import editorial_upgrade
+          # A visibly filmable evergreen subject with a large real-camera stock pool.
+          us_trends._evergreen = lambda theme: 'how ocean waves curl and break on a sandy beach'
+          editorial_upgrade.POLICY += '''
+          ONE-OFF TEST: The Short shows genuine filmed ocean waves rolling,
+          curling, breaking into visible white foam, washing onto sandy beach,
+          then receding. Each of eight scenes MUST describe a distinct observable
+          moment of that same event, with truthful narration. Use independently
+          written accessible English; do not claim any precise wave height,
+          measured speed, tidal cause, underwater seabed, invisible molecules,
+          surfing, swimmers, or a specific beach unless the clips show it.
+          Search genuine Pexels portrait footage using eight meaningfully varied
+          literal queries such as ocean wave breaking, waves sandy beach,
+          ocean surf foam, beach waves closeup, waves washing shore,
+          crashing waves sand, water retreating beach, ocean wave curling.
+          No generic unrelated pictures, AI footage, repeated stock ID or
+          repeated footage fingerprint. End with the true visible result,
+          then a natural short subscription invitation.
+          '''
+          import montage_entry
+          montage_entry.main()
+          PY
+      - name: Retain video and review evidence for three days
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: requested-recovery-short-${{ github.run_id }}
+          path: |
+            shorts_bot/output/short.mp4
+            shorts_bot/output/plan.json
+            shorts_bot/output/visual_sources.json
+          if-no-files-found: ignore
+          retention-days: 3
