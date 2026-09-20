@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   preview-first:
-    name: Fix first video, render MP4 for review, DO NOT publish
+    name: Produce original MP4 for review, DO NOT publish
     runs-on: ubuntu-latest
     timeout-minutes: 55
     env:
@@ -26,8 +26,8 @@ jobs:
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
       YT_DATA_API_KEY: ${{ secrets.YT_DATA_API_KEY }}
       YOUTUBE_PRIVACY: private
-      GEMINI_MODEL: gemini-3.5-flash-lite
-      GEMINI_FALLBACK_MODELS: gemini-3.5-flash,gemini-3.6-flash
+      GEMINI_MODEL: gemini-3.6-flash
+      GEMINI_FALLBACK_MODELS: gemini-3.5-flash,gemini-3.5-flash-lite
       TTS_VOICE: am_michael
       SHORTS_THEME: everyday
       SHORTS_AI_REVIEW: '1'
@@ -37,6 +37,7 @@ jobs:
       SHORTS_MUSIC: '1'
       SHORTS_MUSIC_GAIN: '0.20'
       SHORTS_SKIP_UPLOAD: '1'
+      SHORTS_PREVIEW_LOCK_TOPIC: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,6 +71,7 @@ jobs:
           assert request['topic'] == 'how an espresso machine brews coffee'
           assert request['publish'] is False
           assert os.environ['SHORTS_SKIP_UPLOAD'] == '1'
+          assert os.environ['SHORTS_PREVIEW_LOCK_TOPIC'] == '1'
           assert os.environ.get('GITHUB_TOKEN')
           print('PREVIEW ONLY: YouTube publishing disabled until MP4 is reviewed.', flush=True)
           PY
