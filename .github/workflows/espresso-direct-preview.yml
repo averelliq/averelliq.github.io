@@ -1,0 +1,66 @@
+name: Direct Espresso MP4 Preview
+
+on:
+  push:
+    paths:
+      - 'shorts_bot/espresso_direct_request.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: global-shorts-bot
+  cancel-in-progress: false
+
+jobs:
+  render-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      TTS_VOICE: am_michael
+      SHORTS_SKIP_UPLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: shorts_bot/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: kokoro-${{ runner.os }}-v1
+      - name: Install FFmpeg and voice dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg espeak-ng libsndfile1
+      - name: Install dependencies and confirm upload is disabled
+        run: |
+          pip install -r shorts_bot/requirements.txt
+          pip check
+          python -m compileall -q shorts_bot
+          python - <<'PY'
+          import os, json
+          from pathlib import Path
+          request = json.loads(Path('shorts_bot/espresso_direct_request.json').read_text())
+          assert request['preview_only'] is True
+          assert os.environ['SHORTS_SKIP_UPLOAD'] == '1'
+          assert os.environ['PEXELS_API_KEY']
+          print('Preview only; no YouTube upload action in this workflow', flush=True)
+          PY
+      - name: Restore verified footage, narrate, render and check MP4
+        run: PYTHONPATH=shorts_bot python -u shorts_bot/espresso_direct_preview.py
+      - name: Save playable MP4, subtitles and eight review frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: espresso-review-${{ github.run_id }}
+          path: |
+            shorts_bot/output/short.mp4
+            shorts_bot/output/plan.json
+            shorts_bot/output/visual_sources.json
+            shorts_bot/output/scene_*.jpg
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
