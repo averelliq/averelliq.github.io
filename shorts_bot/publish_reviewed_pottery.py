@@ -1,7 +1,4 @@
-"""Publish ONLY the exact manually reviewed pottery preview, once.
-
-Never regenerate footage or synthesize narration in the release job.
-"""
+"""Publish ONLY the exact reviewed pottery MP4 once; never re-render in release."""
 from __future__ import annotations
 
 import base64
@@ -20,13 +17,15 @@ ARTIFACT = ROOT / "reviewed_pottery_artifact"
 REQUEST = ROOT / "pottery_release_request.json"
 HISTORY = "shorts_bot/published_history.json"
 REPO = "averelliq/averelliq.github.io"
-PREVIEW_RUN = 35480740029
-TOPIC = "how a potter shapes a clay bowl on a wheel"
+PREVIEW_RUN = 35481199211
+TOPIC = "how a potter shapes clay on a spinning wheel"
+TITLE = "How Potters Shape Spinning Clay"
+DESCRIPTION = "Watch skilled hands shape wet clay on a spinning pottery wheel, from opening the center to refining the rim."
 
 
 def verify(path: Path, expected_sha256: str) -> float:
     if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha256:
-        raise ValueError("Reviewed pottery MP4 does not match exact approved file")
+        raise ValueError("Reviewed pottery MP4 differs from exact approved file")
     info = json.loads(subprocess.run(
         ["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(path)],
         check=True, capture_output=True, text=True,
@@ -39,7 +38,7 @@ def verify(path: Path, expected_sha256: str) -> float:
             int(picture[0]["width"]) != 1080 or int(picture[0]["height"]) != 1920 or
             picture[0].get("codec_name") != "h264" or sound[0].get("codec_name") != "aac" or
             not 20 <= seconds <= 58 or path.stat().st_size < 1_000_000):
-        raise ValueError("Pottery MP4 codec, tracks, duration or quality gate failed")
+        raise ValueError("Reviewed MP4 codec/tracks/duration/quality gate failed")
     subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-f", "null", "-"],
                    check=True, capture_output=True)
     return seconds
@@ -79,8 +78,7 @@ def upload(video: Path) -> str:
     credentials.refresh(Request())
     youtube = build("youtube", "v3", credentials=credentials, cache_discovery=False)
     body = {"snippet": {
-        "title": "How Clay Becomes a Bowl",
-        "description": "Watch a potter shape clay on a spinning wheel, from the first touch to the forming bowl.",
+        "title": TITLE, "description": DESCRIPTION,
         "tags": ["pottery", "pottery wheel", "clay", "ceramics", "craftsmanship"],
         "categoryId": "27", "defaultLanguage": "en",
     }, "status": {"privacyStatus": "public", "selfDeclaredMadeForKids": False}}
@@ -106,7 +104,7 @@ def main():
     if not (request.get("approved_after_audiovisual_review") is True and
             request.get("publish_public") is True and
             request.get("source_run_id") == PREVIEW_RUN):
-        raise ValueError("Exact preview and explicit audiovisual review approval required")
+        raise ValueError("Exact preview and audiovisual review approval required")
     digest = request.get("mp4_sha256")
     if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
         raise ValueError("Exact reviewed video fingerprint required")
@@ -115,14 +113,15 @@ def main():
     plan = json.loads((ARTIFACT / "plan.json").read_text(encoding="utf-8"))
     sources = json.loads((ARTIFACT / "visual_sources.json").read_text(encoding="utf-8"))
     ids = [s.get("pexels_video_id") for s in plan.get("scenes", [])]
-    if (plan.get("topic") != TOPIC or not plan.get("preview_only") or
+    if (plan.get("topic") != TOPIC or plan.get("title") != TITLE or
+            plan.get("description") != DESCRIPTION or not plan.get("preview_only") or
             len(ids) != 7 or len(sources) != 7 or len(set(ids)) != 7 or
             any(type(item) is not int or item <= 0 for item in ids) or
             not (ARTIFACT / "manual_review_required.txt").is_file()):
-        raise ValueError("Reviewed edit, source provenance or review evidence missing")
+        raise ValueError("Reviewed edit, metadata or source provenance mismatched")
     if not all((ARTIFACT / f"scene_{i:02d}_{moment}.jpg").is_file()
                for i in range(1, 8) for moment in range(1, 4)):
-        raise ValueError("Missing required 21 preview frames")
+        raise ValueError("Missing required 21 scene preview frames")
     session = requests.Session()
     session.headers.update({"Authorization": f"Bearer {os.environ['GH_TOKEN']}",
                             "Accept": "application/vnd.github+json",
@@ -132,7 +131,7 @@ def main():
            or row.get("mp4_sha256") == digest for row in history):
         raise ValueError("Identical video already reserved or published; refusing duplicate")
     history.append({"topic": TOPIC, "mp4_sha256": digest,
-                    "title": "How Clay Becomes a Bowl", "state": "publishing",
+                    "title": TITLE, "state": "publishing",
                     "at": datetime.now(timezone.utc).isoformat(),
                     "source_run_id": str(PREVIEW_RUN),
                     "publish_run_id": os.environ.get("GITHUB_RUN_ID", "unknown")})
