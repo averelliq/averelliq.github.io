@@ -32,9 +32,10 @@
     "topic": "how a blacksmith forges hot metal",
     "mp4_sha256": "41d796b4d304eab5200d14537a316b66f6ded8e874ddf80556bd6cf740981299",
     "title": "How Blacksmiths Shape Metal",
-    "state": "publishing",
+    "state": "published",
     "source_run_id": "35482216058",
     "publish_run_id": "35482479734",
-    "at": "2026-09-20T01:52:15.948999+00:00"
+    "at": "2026-09-20T01:52:19.265345+00:00",
+    "video_id": "hbe9B9QKOrQ"
   }
 ]
