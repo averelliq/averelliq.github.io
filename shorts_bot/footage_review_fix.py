@@ -1,8 +1,7 @@
-"""Resilient, conservative early/middle/late footage review.
+"""Conservative footage inspection in four-clip batches to avoid excessive API calls.
 
-Gemini can return JSON arrays despite an object-shaped response request, or truncate
-large responses. Review in small batches, normalize only an unambiguous array shape,
-retry malformed replies individually, and never treat invalid/missing fields as approval.
+An unavailable model, invalid JSON, uncertain frame or wrong subject never grants
+approval. Batch parsing may retry a malformed response, but not a quota outage.
 """
 from __future__ import annotations
 
@@ -49,7 +48,6 @@ def _review(topic, items):
     response.raise_for_status()
     text = "".join(p.get("text", "") for p in response.json()["candidates"][0]["content"]["parts"])
     payload = json.loads(text)
-    # Some valid model responses are a bare array despite the requested envelope.
     if isinstance(payload, dict) and set(payload) == {"clips"}:
         results = payload["clips"]
     elif isinstance(payload, list):
@@ -82,10 +80,10 @@ def install() -> None:
     if _installed:
         return
 
-    def review_in_small_batches(topic, items):
+    def review_in_batches(topic, items):
         decisions = []
-        for start in range(0, len(items), 2):
-            batch = items[start:start + 2]
+        for start in range(0, len(items), 4):
+            batch = items[start:start + 4]
             try:
                 decisions.extend(_review(topic, batch))
                 continue
@@ -110,5 +108,5 @@ def install() -> None:
             raise ValueError("Footage review count inconsistent; no upload")
         return decisions
 
-    footage_first._vision = review_in_small_batches
+    footage_first._vision = review_in_batches
     _installed = True
