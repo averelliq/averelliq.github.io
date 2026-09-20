@@ -1,19 +1,25 @@
 # Restoration Shorts Bot — review-first prototype
 
-A browser-driven GitHub Actions workflow to discover licensed restoration footage, create English narration and render vertical Shorts. **No automatic public uploads.** This bot is staged in a separate folder on an isolated branch; the existing `main` branch is unchanged.
+A browser-only GitHub Actions project for finding Pexels restoration footage, writing English narration and rendering vertical Shorts. It does **not** automatically publish publicly. No restoration video has yet been produced or uploaded.
 
-**Important:** Workflows inside this folder are staged source files, NOT active GitHub Actions in the existing website repository. To run them, create a NEW GitHub repository and upload the CONTENTS of `restoration-shorts-bot` to the root of that new repository (or use the ZIP provided in chat). The new repository's default branch must include `.github/workflows/*.yml` at its ROOT. No video has been made or uploaded yet.
+## Reusing your existing GitHub connections
 
-## Browser-only setup
+This bot is in the **same** `averelliq/averelliq.github.io` repository, on the isolated `restoration-shorts-bot-v1` branch. After the proposed change is merged to `main`, the workflows at `.github/workflows/restoration-discover.yml` and `.github/workflows/restoration-render.yml` will be visible in Actions. Existing workflows and `main` remain untouched until that happens.
 
-1. Get a free Pexels API key at https://www.pexels.com/api/ and save it at new repository **Settings → Secrets and variables → Actions** as `PEXELS_API_KEY`.
-2. Run **Actions → Discover licensed footage → Run workflow**. Download `review-candidates`, watch the proposed clips and verify actual restoration, visible before/after, the Pexels source and NO burned-in captions/watermark.
-3. Copy `examples/manifest.example.json` to `approved/my-restoration.json` in your new repository. Replace the intentionally invalid ID `0` with a REAL Pexels video ID, describe 3–6 visible steps accurately in English, and truthfully set all the review flags.
-4. Run **Render approved restoration Short** with manifest `approved/my-restoration.json`. Leave `upload_private` off to review the exported 1080×1920, 40–50-second MP4, script and source attribution first.
-5. To upload privately, configure Google Cloud YouTube Data API v3 OAuth and add `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN` as encrypted GitHub Actions secrets. Run with `upload_private=true`. This uploads **private**, not public. Never share or commit tokens.
+The existing KAYIP FREKANS workflow already references `secrets.PEXELS_API_KEY`. Restoration discovery reuses that exact secret name. This proves the old workflow *references* the name, not that a working secret is currently present: this GitHub connection cannot inspect the secret store.
 
-The voice uses Edge TTS; service availability can change. Pexels search results are not guaranteed to show actual before/after restoration. No autonomous visual verification or reliable embedded-caption removal exists in this prototype. Original audio and separate subtitle streams ARE excluded. Adding English narration alone does not guarantee monetization. Unverified new YouTube API projects may have private-only upload restrictions.
+The rendering workflow references same-repository `secrets.YT_CLIENT_ID`, `secrets.YT_CLIENT_SECRET`, and `secrets.YT_REFRESH_TOKEN`. We cannot verify their presence, names, OAuth scope, or whether they point to the intended global Shorts channel. A credential configured only in another repository is not automatically shared. The existing Shorts workflow has an intentionally disabled YouTube publish step, so it is **not** evidence that OAuth is ready. No secrets have been copied, modified, printed or exposed.
 
-Local optional tests: `python -m unittest discover -s tests -v`.
+## Workflow
 
-Sources: https://www.pexels.com/api/documentation/ · https://www.pexels.com/license/ · https://support.google.com/youtube/answer/1311392 · https://developers.google.com/youtube/v3/docs/videos/insert
+1. Open **Actions → Restoration Shorts - Discover footage → Run workflow** (after merging to `main`). The workflow also searches once a day. It stores proposed 40–90-second Pexels footage in a `restoration-review-candidates` artifact.
+2. Watch each candidate and confirm that the visuals show an actual restoration with before-and-after, clean source footage without embedded captions or watermarks, and acceptable reuse rights. Pexels metadata alone cannot verify these.
+3. Add a truthful manifest inside `restoration-shorts-bot/approved/`, using `restoration-shorts-bot/examples/manifest.example.json` as a guide. Fill in a *real* video ID, observed English restoration steps, and required review flags. The example ID is deliberately invalid.
+4. Run **Actions → Restoration Shorts - Render reviewed footage → Run workflow** with input `approved/my-restoration.json`. The MP4, narration script and source information appear in the `restoration-preview` artifact. The output target is 1080×1920, 40–50 seconds.
+5. If same-repository YouTube OAuth credentials are confirmed to be valid for the *intended* channel, manually opt into `upload_private=true` to upload a **private** review video. The bot does not publish publicly.
+
+The renderer removes original audio and separate subtitle streams by remapping only the selected video stream and new narration. It cannot reliably erase burned-in subtitles, nor autonomously verify the actions depicted. Edge TTS availability may change. English narration does not automatically make someone else's footage original for YouTube monetization.
+
+Local optional tests: `cd restoration-shorts-bot && python -m unittest discover -s tests -v`.
+
+Useful references: https://www.pexels.com/api/documentation/ · https://www.pexels.com/license/ · https://support.google.com/youtube/answer/1311392 · https://developers.google.com/youtube/v3/docs/videos/insert
