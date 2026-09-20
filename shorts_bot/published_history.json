@@ -57,5 +57,14 @@
     "publish_run_id": "35482961636",
     "at": "2026-09-20T02:04:08.940360+00:00",
     "video_id": "yo-kTFSG8Cs"
+  },
+  {
+    "topic": "how a sewing machine joins fabric",
+    "mp4_sha256": "28d744905637ea5a6617c2727e9e4379060e8e0675a9cd415ec0eb08c35aa214",
+    "title": "How Sewing Machines Stitch",
+    "state": "publishing",
+    "source_run_id": "35482613532",
+    "publish_run_id": "35482961636",
+    "at": "2026-09-20T02:04:11.085504+00:00"
   }
 ]
