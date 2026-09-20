@@ -1,7 +1,7 @@
-"""Require original Full HD portrait stock video before editing or rendering.
+"""Require genuine native-HD stock video, including usable 4K landscape crops.
 
-Upscaling a 720p source to 1080p cannot restore missing visual detail.
-Reject lower-resolution sources rather than silently lowering the standard.
+A 4K landscape source has enough native pixels for a 1080x1920 portrait
+center crop. A regular 1080p landscape source does not; never upscale it.
 """
 from __future__ import annotations
 
@@ -14,17 +14,24 @@ MIN_HEIGHT = 1920
 
 
 def hd_file_options(video: dict[str, Any]) -> list[str]:
-    """Choose actual portrait Full HD or better files, never 720p upscales."""
+    """Select native >=1080x1920 portrait crops without resolution upscaling."""
     choices: list[tuple[int, int, str]] = []
     for item in video.get("video_files") or []:
         width = int(item.get("width") or 0)
         height = int(item.get("height") or 0)
         url = item.get("link")
-        if (isinstance(url, str) and url.startswith("https://")
-                and height > width and width >= MIN_WIDTH and height >= MIN_HEIGHT):
-            # Full-HD source first; higher-resolution files remain valid fallbacks.
-            distance = abs(width - MIN_WIDTH) + abs(height - MIN_HEIGHT)
-            choices.append((distance, -(width * height), url))
+        if not isinstance(url, str) or not url.startswith("https://"):
+            continue
+        # Portrait sources need at least 1080x1920. Landscape sources need
+        # at least 1920 vertical pixels for a native 1080x1920 center crop.
+        if width < MIN_WIDTH or height < MIN_HEIGHT:
+            continue
+        crop_width = min(width, int(height * 9 / 16))
+        crop_height = min(height, int(width * 16 / 9))
+        if crop_width < MIN_WIDTH or crop_height < MIN_HEIGHT:
+            continue
+        distance = abs(crop_width - MIN_WIDTH) + abs(crop_height - MIN_HEIGHT)
+        choices.append((distance, -(width * height), url))
     return [url for _, __, url in sorted(choices)[:2]]
 
 
