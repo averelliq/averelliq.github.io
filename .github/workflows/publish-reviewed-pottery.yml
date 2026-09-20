@@ -1,0 +1,54 @@
+name: Publish Reviewed Pottery Short
+
+on:
+  push:
+    paths:
+      - 'shorts_bot/pottery_release_request.json'
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: global-shorts-bot
+  cancel-in-progress: false
+
+jobs:
+  release-reviewed-pottery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+      YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+      YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+    steps:
+      - name: Checkout the single-video release script
+        uses: actions/checkout@v4
+      - name: Download exact reviewed pottery MP4 from preview run
+        uses: actions/download-artifact@v4
+        with:
+          name: pottery-preview-35480740029
+          run-id: 35480740029
+          github-token: ${{ github.token }}
+          path: shorts_bot/reviewed_pottery_artifact
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install FFmpeg and minimal uploader dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install 'requests>=2.31,<3' 'google-api-python-client>=2.100,<3' 'google-auth>=2.20,<3'
+          python -m pip check
+      - name: Verify reviewed MP4 hash, codec, source evidence and publish once
+        run: python -u shorts_bot/publish_reviewed_pottery.py
+      - name: Preserve public upload receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-pottery-publication-${{ github.run_id }}
+          path: shorts_bot/reviewed_pottery_artifact/publication_receipt.json
+          if-no-files-found: ignore
+          retention-days: 30
