@@ -1,6 +1,11 @@
 name: Restoration Shorts - Discover footage
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/restoration-discover.yml'
+      - 'restoration-shorts-bot/**'
   workflow_dispatch:
   schedule:
     - cron: '20 8 * * *'
