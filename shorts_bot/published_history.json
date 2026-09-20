@@ -97,5 +97,14 @@
     "publish_run_id": "35490841877",
     "at": "2026-09-20T05:07:36.204814+00:00",
     "video_id": "SllzHcDvwR4"
+  },
+  {
+    "topic": "how grapes become fresh juice",
+    "mp4_sha256": "513865ab23e0ef23cca0b2c75d14bae85e68507d2473bff421196e6b07174f6d",
+    "title": "How Grapes Release Juice",
+    "state": "publishing",
+    "source_run_id": "35492137791",
+    "publish_run_id": "35492389600",
+    "at": "2026-09-20T05:43:55.032594+00:00"
   }
 ]
