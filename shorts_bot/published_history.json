@@ -72,9 +72,10 @@
     "topic": "how sushi chefs roll sushi",
     "mp4_sha256": "378840f12c047867d50b5dbc538732281b9ae180ad8dcf336e69e83107334306",
     "title": "How Sushi Rolls Are Made",
-    "state": "publishing",
+    "state": "published",
     "source_run_id": "35482613532",
     "publish_run_id": "35482961636",
-    "at": "2026-09-20T02:04:15.987401+00:00"
+    "at": "2026-09-20T02:04:19.183460+00:00",
+    "video_id": "HXybdKpdYlE"
   }
 ]
