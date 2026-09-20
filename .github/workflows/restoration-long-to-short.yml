@@ -4,29 +4,38 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Published GitHub Release tag that contains your source MP4 (example: restoration-input-001)"
-        required: true
+        description: "Optional GitHub Release tag containing your original video"
+        required: false
+        default: ""
+        type: string
+      source_url:
+        description: "Optional publicly accessible DIRECT HTTPS video file URL (not a webpage)"
+        required: false
+        default: ""
         type: string
       video_asset:
-        description: "Video filename or matching pattern; default matches MP4 assets"
+        description: "Release asset filename pattern, when using a release"
         required: false
         default: "*.mp4"
         type: string
       narration:
-        description: "Optional English narration based on what actually happens in YOUR video"
+        description: "Optional accurate English narration for this video"
         required: false
         default: ""
         type: string
       subtitle_box:
-        description: "Optional burned-in subtitle area in source pixels: x:y:width:height, or none"
+        description: "Optional source-pixel text rectangle x:y:width:height, or none"
         required: false
         default: "none"
         type: string
   release:
     types: [published]
+  issues:
+    types: [opened]
 
 permissions:
   contents: read
+  issues: read
 
 concurrency:
   group: restoration-long-${{ github.run_id }}
@@ -34,12 +43,18 @@ concurrency:
 
 jobs:
   make-short:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'restoration-input-')
+    # Public issues can be opened by anyone: process ONLY issues created by the repo owner.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'restoration-input-')) ||
+      (github.event_name == 'issues' && github.event.issue.user.login == github.repository_owner && startsWith(github.event.issue.title, 'RESTORATION VIDEO:'))
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
+      RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name || '' }}
+      SOURCE_URL: ${{ inputs.source_url || '' }}
+      ISSUE_BODY: ${{ github.event.issue.body || '' }}
       VIDEO_ASSET: ${{ inputs.video_asset || '*.mp4' }}
       NARRATION: ${{ inputs.narration || '' }}
       SUBTITLE_BOX: ${{ inputs.subtitle_box || 'none' }}
@@ -57,17 +72,36 @@ jobs:
           python -m pip install --disable-pip-version-check -r restoration-shorts-bot/long_requirements.txt
       - name: 04 - Run source-order and subtitle-box checks
         run: python -m unittest discover -s restoration-shorts-bot/tests -p 'test_long_to_short.py' -v
-      - name: 05 - Download the video attached to your GitHub Release
+      - name: 05 - Get one source video from owner URL or GitHub Release
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p incoming output
-          gh release download "$RELEASE_TAG" --pattern "$VIDEO_ASSET" --dir incoming
+          if [[ "$GITHUB_EVENT_NAME" == "issues" ]]; then
+            SOURCE_URL="$(printf '%s\n' "$ISSUE_BODY" | sed -n 's/^VIDEO_URL=//p' | head -n 1)"
+          fi
+          if [[ -n "$SOURCE_URL" ]]; then
+            if [[ -n "$RELEASE_TAG" ]]; then
+              echo 'Supply a source URL OR a release tag, not both.' >&2
+              exit 1
+            fi
+            case "$SOURCE_URL" in
+              https://*) ;;
+              *) echo 'A direct HTTPS video URL is required.' >&2; exit 1 ;;
+            esac
+            # This URL is provided by the repository owner; it must serve video bytes without login.
+            curl --fail --location --retry 2 --connect-timeout 20 --max-time 600 --max-filesize 1500000000 --output incoming/source.mp4 "$SOURCE_URL"
+          elif [[ -n "$RELEASE_TAG" ]]; then
+            gh release download "$RELEASE_TAG" --pattern "$VIDEO_ASSET" --dir incoming
+          else
+            echo 'No video provided: send a direct HTTPS URL or attach an MP4 to a release.' >&2
+            exit 1
+          fi
           python - <<'PY'
           from pathlib import Path
           paths = [p for p in Path('incoming').rglob('*') if p.is_file() and p.suffix.lower() in {'.mp4','.mov','.mkv','.webm','.m4v'}]
-          if len(paths) != 1:
-              raise SystemExit(f'Expected exactly one video Release asset; found {len(paths)}. Select a single asset using video_asset.')
+          if len(paths) != 1 or paths[0].stat().st_size < 1024:
+              raise SystemExit(f'Expected one nonempty source video; found {len(paths)}.')
           print('Received one video:', paths[0].name, 'size:', paths[0].stat().st_size)
           PY
       - name: 06 - Process ALL source footage chronologically, narrate and verify
