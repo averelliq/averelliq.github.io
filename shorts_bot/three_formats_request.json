@@ -1,0 +1,9 @@
+{
+  "request_id": "curiorush-three-process-formats-2026-09-20",
+  "categories": ["how-its-made", "how-it-works", "raw-to-finished"],
+  "publish_public": true,
+  "one_video_per_category": true,
+  "short_titles_and_descriptions": true,
+  "footage_first": true,
+  "abort_on_unmatched_footage_or_bad_voice": true
+}
