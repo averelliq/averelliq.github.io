@@ -56,7 +56,7 @@ def _collect(topic: str) -> list[dict]:
     results = []
     ids = set()
     for query in TOPIC_QUERIES[topic]:
-        # Balance sources across actions rather than taking near-duplicates
+        # Balance sources across visible actions rather than taking near-duplicates
         # from the first generic query.
         response = requests.get("https://api.pexels.com/v1/search",
             headers={"Authorization": token},
@@ -122,15 +122,19 @@ def _review(topic: str, items: list[dict]) -> list[dict]:
         "Reject unrelated stationery, stock backgrounds without this subject, diagrams, "
         "CGI, AI illustrations, screenshots and photos with existing large overlay text. "
         "An exterior photo need not depict invisible inner workings: a separate "
-        "original schematic will depict those. Be conservative. Return ONLY JSON "
-        '{"photos":[{"number":1,"approved":true,"visible_subject":"specific observed subject"}]}. '
+        "original schematic will depict those. Reject if the relevant object is tiny "
+        "or almost entirely outside the frame. Estimate the center of the actual "
+        "relevant object (0..1000 coordinates) and its area as percent (0..100). "
+        "Be conservative. Return ONLY JSON "
+        '{"photos":[{"number":1,"approved":true,"visible_subject":"specific observed subject",'
+        '"center_x":500,"center_y":500,"subject_size_percent":30}]}. '
         "Return exactly one entry for every numbered photo, in the same order."
     )}]
     for number, item in enumerate(items, 1):
         parts.extend(({"text": f"PHOTO {number} (photo, not a drawing):"},
                       {"inline_data": {"mime_type": "image/jpeg",
                                        "data": base64.b64encode(item["preview"]).decode("ascii")}}))
-    model = os.getenv("MECHANISM_VISION_MODEL", "gemini-2.5-flash")
+    model = os.getenv("MECHANISM_VISION_MODEL", "gemini-3.5-flash-lite")
     response = requests.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         headers={"x-goog-api-key": key, "Content-Type": "application/json"},
@@ -147,10 +151,16 @@ def _review(topic: str, items: list[dict]) -> list[dict]:
     for i, (item, decision) in enumerate(zip(items, decisions), 1):
         if (not isinstance(decision, dict) or type(decision.get("number")) is not int
                 or decision["number"] != i or type(decision.get("approved")) is not bool
-                or not isinstance(decision.get("visible_subject"), str)):
+                or not isinstance(decision.get("visible_subject"), str)
+                or any(type(decision.get(k)) is not int or not 0 <= decision[k] <= 1000
+                       for k in ("center_x", "center_y"))
+                or type(decision.get("subject_size_percent")) is not int
+                or not 0 <= decision["subject_size_percent"] <= 100):
             raise ValueError("Malformed photo verification; upload blocked")
-        if decision["approved"] and len(decision["visible_subject"].strip()) >= 4:
-            approved.append({**item, "visible_subject": decision["visible_subject"].strip()})
+        if (decision["approved"] and len(decision["visible_subject"].strip()) >= 4
+                and decision["subject_size_percent"] >= 12):
+            approved.append({**item, "visible_subject": decision["visible_subject"].strip(),
+                             "center_x": decision["center_x"], "center_y": decision["center_y"]})
     if len(approved) < MIN_APPROVED:
         raise RuntimeError(f"Only {len(approved)} images showed the actual {topic}; upload blocked")
     return approved[:8]
@@ -200,8 +210,10 @@ def _compose(topic: str):
         # A restrained crop shift adds movement; the subject stays in frame.
         zoom = 1.0 + .045 * local
         w, h = PHOTO_BOX[2] - PHOTO_BOX[0], PHOTO_BOX[3] - PHOTO_BOX[1]
+        focus = (_photos[scene % len(_photos)]["center_x"] / 1000,
+                 _photos[scene % len(_photos)]["center_y"] / 1000)
         shot = ImageOps.fit(selected, (int(w * zoom), int(h * zoom)), method=Image.Resampling.LANCZOS,
-                            centering=(.5, .5))
+                            centering=focus)
         off_x = int((shot.width - w) * local)
         shot = shot.crop((off_x, 0, off_x + w, h))
         base.paste(shot, PHOTO_BOX[:2])
@@ -239,11 +251,16 @@ def _verify_final(path: Path) -> None:
             "-ss", str(duration * fraction), "-i", str(path), "-frames:v", "1",
             "-vf", "scale=540:960", "-f", "image2pipe", "-vcodec", "png", "pipe:1"], timeout=25)
         with Image.open(io.BytesIO(raw)) as img:
-            sample = img.convert("RGB").crop((45, 300, 278, 515)).resize((48, 48))
-            pictures.append(np.asarray(sample, dtype=np.float32))
-    if any(float(np.mean(np.std(p, axis=(0, 1)))) < 12 for p in pictures):
+            decoded = img.convert("RGB")
+            # The cutaway covers lower-right; inspect the entire upper photo and
+            # the unobstructed bottom-left, not an arbitrary blank background patch.
+            upper = np.asarray(decoded.crop((45, 310, 493, 512)).resize((64, 32)), dtype=np.float32)
+            lower = np.asarray(decoded.crop((45, 520, 272, 714)).resize((48, 48)), dtype=np.float32)
+            pictures.append((upper, lower))
+    if any(max(float(np.mean(np.std(region, axis=(0, 1)))) for region in picture) < 12
+           for picture in pictures):
         raise RuntimeError("Final MP4 contains a blank or flat photographic panel; upload blocked")
-    distances = [float(np.mean(np.abs(pictures[i] - pictures[j])))
+    distances = [float(np.mean(np.abs(pictures[i][0] - pictures[j][0])))
                  for i in range(len(pictures)) for j in range(i)]
     if max(distances, default=0) < 10:
         raise RuntimeError("Final MP4 never changes its actual photographic shot; upload blocked")
@@ -264,7 +281,7 @@ def _main():
     plan_file = mechanism.video.OUTPUT / "plan.json"
     plan = json.loads(plan_file.read_text(encoding="utf-8"))
     plan["visual_provenance"] = "Original animated cutaway over verified Pexels real-object photographs"
-    plan["photo_sources"] = [{k: item[k] for k in ("id", "source", "photographer", "visible_subject")}
+    plan["photo_sources"] = [{k: item[k] for k in ("id", "source", "photographer", "visible_subject", "center_x", "center_y")}
                              for item in _photos]
     plan["real_photo_qc"] = True
     plan_file.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
