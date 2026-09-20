@@ -1,6 +1,8 @@
-"""Run the Shorts generator with retries limited to Gemini API requests.
+"""Retry transient Gemini requests without relaxing any editorial or visual gate.
 
-Never retry the entire pipeline: doing so could upload duplicate YouTube videos.
+Never retry the whole video pipeline: that can cause duplicate YouTube uploads.
+Only models explicitly configured as available are attempted; HTTP 404 models
+are not reused, and quota failures never count as footage approval.
 """
 from __future__ import annotations
 
@@ -18,28 +20,28 @@ import main as bot
 _ORIGINAL_POST = requests.post
 _TRANSIENT_STATUS = {429, 500, 502, 503, 504}
 _MODEL_UNAVAILABLE_STATUS = {404}
-_MAX_ATTEMPTS = 5
-_DEFAULT_FALLBACK_MODELS = (
-    "gemini-3.5-flash-lite",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-)
+_MAX_ATTEMPTS = 3
+_LAST_GEMINI_REQUEST = 0.0
+_MIN_INTERVAL_SECONDS = 9.0
 
 
 def _retry_delay(response: requests.Response | None, attempt: int) -> float:
-    backoff = min(30.0, 2.0 ** (attempt + 1)) + random.uniform(0, 1)
+    # A 429 may be a per-minute quota: back off rather than rapid-fire retries.
+    status = response.status_code if response is not None else None
+    backoff = ((18.0, 36.0, 60.0) if status == 429 else
+               (3.0, 8.0, 16.0))[min(attempt, 2)] + random.uniform(0, 2)
     if response is None:
         return backoff
     header = response.headers.get("Retry-After", "").strip()
     if header:
         try:
-            return min(60.0, max(0.0, float(header)))
+            return min(90.0, max(backoff, float(header)))
         except ValueError:
             try:
                 deadline = parsedate_to_datetime(header)
                 if deadline.tzinfo is None:
                     deadline = deadline.replace(tzinfo=timezone.utc)
-                return min(60.0, max(0.0, (deadline - datetime.now(timezone.utc)).total_seconds()))
+                return min(90.0, max(backoff, (deadline - datetime.now(timezone.utc)).total_seconds()))
             except (TypeError, ValueError, OverflowError):
                 pass
     return backoff
@@ -50,36 +52,35 @@ def _model_candidates(url: str) -> list[tuple[str, str]]:
     if not match:
         return [("", url)]
     primary = match.group(1)
-    configured = [
-        item.strip() for item in os.getenv("GEMINI_FALLBACK_MODELS", "").split(",")
-        if item.strip()
-    ]
-    models = [primary, *configured, *_DEFAULT_FALLBACK_MODELS]
-    unique: list[str] = []
-    for model in models:
-        if model not in unique:
-            unique.append(model)
+    # Do not append stale hard-coded model names: they returned HTTP 404 in
+    # production and were incorrectly being treated as meaningful fallbacks.
+    configured = [item.strip() for item in os.getenv("GEMINI_FALLBACK_MODELS", "").split(",") if item.strip()]
+    unique = list(dict.fromkeys([primary, *configured]))
     return [(model, url.replace(f"/models/{primary}:", f"/models/{model}:")) for model in unique]
 
 
 def resilient_post(url: str, *args, **kwargs):
+    global _LAST_GEMINI_REQUEST
     if "generativelanguage.googleapis.com" not in url:
         return _ORIGINAL_POST(url, *args, **kwargs)
 
     candidates = _model_candidates(url)
     last_response = None
     last_exception: Exception | None = None
-
     for model_index, (model, model_url) in enumerate(candidates, start=1):
         if model:
             print(f"Gemini model attempt {model_index}/{len(candidates)}: {model}", flush=True)
         for attempt in range(_MAX_ATTEMPTS):
             response = None
             try:
+                idle = _MIN_INTERVAL_SECONDS - (time.monotonic() - _LAST_GEMINI_REQUEST)
+                if idle > 0:
+                    time.sleep(idle)
+                _LAST_GEMINI_REQUEST = time.monotonic()
                 response = _ORIGINAL_POST(model_url, *args, **kwargs)
                 last_response = response
                 if response.status_code in _MODEL_UNAVAILABLE_STATUS:
-                    print(f"Gemini model {model or 'primary'} returned HTTP 404; trying another model.", flush=True)
+                    print(f"Gemini model {model or 'primary'} returned HTTP 404; excluding it.", flush=True)
                     break
                 if response.status_code not in _TRANSIENT_STATUS:
                     if response.ok and model and model_index > 1:
@@ -87,25 +88,16 @@ def resilient_post(url: str, *args, **kwargs):
                     return response
                 reason = f"HTTP {response.status_code}"
                 if attempt == _MAX_ATTEMPTS - 1:
-                    print(
-                        f"Gemini {model or 'primary'} temporary {reason} persisted after {_MAX_ATTEMPTS} attempts; trying fallback model.",
-                        flush=True,
-                    )
+                    print(f"Gemini {model or 'primary'} {reason} persisted; moving to configured fallback.", flush=True)
                     break
             except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
                 last_exception = exc
                 reason = type(exc).__name__
                 if attempt == _MAX_ATTEMPTS - 1:
-                    print(
-                        f"Gemini {model or 'primary'} {reason} persisted after {_MAX_ATTEMPTS} attempts; trying fallback model.",
-                        flush=True,
-                    )
+                    print(f"Gemini {model or 'primary'} {reason} persisted; moving to configured fallback.", flush=True)
                     break
             wait = _retry_delay(response, attempt)
-            print(
-                f"Gemini transient error ({reason}); attempt {attempt + 1}/{_MAX_ATTEMPTS}, retrying in {wait:.1f}s.",
-                flush=True,
-            )
+            print(f"Gemini transient error ({reason}); retry {attempt + 1}/{_MAX_ATTEMPTS} in {wait:.1f}s.", flush=True)
             time.sleep(wait)
 
     if last_response is not None:
