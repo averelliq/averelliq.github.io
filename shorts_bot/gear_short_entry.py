@@ -2,6 +2,7 @@
 
 The existing authenticity, originality, audio, and final-render gates must pass
 before the regular uploader can publish. Do not substitute another subject.
+The 2026-09-20 retry uses quota-aware Gemini routing and batched footage review.
 """
 from __future__ import annotations
 
