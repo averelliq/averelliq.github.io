@@ -1,0 +1,90 @@
+name: Restoration Shorts - Full video to 60 seconds
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Published GitHub Release tag that contains your source MP4 (example: restoration-input-001)"
+        required: true
+        type: string
+      video_asset:
+        description: "Video filename or matching pattern; default matches MP4 assets"
+        required: false
+        default: "*.mp4"
+        type: string
+      narration:
+        description: "Optional English narration based on what actually happens in YOUR video"
+        required: false
+        default: ""
+        type: string
+      subtitle_box:
+        description: "Optional burned-in subtitle area in source pixels: x:y:width:height, or none"
+        required: false
+        default: "none"
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restoration-long-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  make-short:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'restoration-input-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
+      VIDEO_ASSET: ${{ inputs.video_asset || '*.mp4' }}
+      NARRATION: ${{ inputs.narration || '' }}
+      SUBTITLE_BOX: ${{ inputs.subtitle_box || 'none' }}
+    steps:
+      - name: 01 - Check out bot source
+        uses: actions/checkout@v4
+      - name: 02 - Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: 03 - Install free video and English speech tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          python -m pip install --disable-pip-version-check -r restoration-shorts-bot/long_requirements.txt
+      - name: 04 - Run source-order and subtitle-box checks
+        run: python -m unittest discover -s restoration-shorts-bot/tests -p 'test_long_to_short.py' -v
+      - name: 05 - Download the video attached to your GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p incoming output
+          gh release download "$RELEASE_TAG" --pattern "$VIDEO_ASSET" --dir incoming
+          python - <<'PY'
+          from pathlib import Path
+          paths = [p for p in Path('incoming').rglob('*') if p.is_file() and p.suffix.lower() in {'.mp4','.mov','.mkv','.webm','.m4v'}]
+          if len(paths) != 1:
+              raise SystemExit(f'Expected exactly one video Release asset; found {len(paths)}. Select a single asset using video_asset.')
+          print('Received one video:', paths[0].name, 'size:', paths[0].stat().st_size)
+          PY
+      - name: 06 - Process ALL source footage chronologically, narrate and verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file="$(find incoming -type f \( -iname '*.mp4' -o -iname '*.mov' -o -iname '*.mkv' -o -iname '*.webm' -o -iname '*.m4v' \) -print -quit)"
+          args=(--input "$source_file" --output output/restoration_short.mp4 --report output/report.json --subtitle-box "$SUBTITLE_BOX")
+          if [[ -n "$NARRATION" ]]; then
+            args+=(--narration "$NARRATION")
+          fi
+          python restoration-shorts-bot/long_to_short.py "${args[@]}"
+      - name: 07 - Save finished MP4 and stage-by-stage QA report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: restoration-short-${{ github.run_id }}
+          path: output/
+          if-no-files-found: warn
+          retention-days: 7
