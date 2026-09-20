@@ -1,9 +1,7 @@
-"""Recover from sparse stock searches without weakening any visual or audio gate.
+"""Recover sparse stock searches without weakening visual or audio gates.
 
-Prior pipeline downloaded at most ten of fifteen hits, reviewed them once and
-abandoned the topic if even one was rejected. This gathers subject-specific
-results more widely and replaces rejected shots until eight UNIQUE real filmed
-native-HD clips actually pass the existing conservative vision review.
+Collect subject-specific native-HD footage and require eight distinct filmed
+shots to pass conservative visual review before writing or uploading a Short.
 """
 from __future__ import annotations
 
@@ -17,6 +15,7 @@ import hd_footage_guard
 
 MAX_POOL = 54
 MAX_CHECKED = 32
+REVIEW_BATCH_SIZE = 4
 EXTRA_QUERIES = {
     "how an espresso machine brews coffee": (
         "espresso machine brewing", "espresso extraction", "espresso coffee pouring",
@@ -28,6 +27,12 @@ EXTRA_QUERIES = {
     "why airplane windows are rounded": (
         "airplane oval window", "airplane cabin windows", "airplane window closeup",
         "passenger airplane window", "airplane interior windows", "airplane wing window",
+    ),
+    "how a steel gear is made": (
+        "steel gear machining", "gear cutting machine", "gear hobbing machine",
+        "metal gear manufacturing", "metal gear cnc cutting", "gear teeth milling",
+        "industrial gear production", "metal gear inspection", "machined metal gears",
+        "gear factory machinery", "industrial machine gears", "gear machining closeup",
     ),
 }
 _installed = False
@@ -84,6 +89,24 @@ def review_replacements(topic: str, queries: tuple[str, ...]):
     fingerprints: list[int] = []
     pending: list[dict[str, Any]] = []
     checked = 0
+
+    def review_pending() -> None:
+        nonlocal pending
+        if not pending:
+            return
+        # Reviewing four clips in one request instead of pairs lowers API
+        # traffic while retaining all three actual frames and every check.
+        verdicts = first._vision(topic, pending)
+        if len(verdicts) != len(pending):
+            raise ValueError("Incomplete footage verdicts; upload blocked")
+        for item, verdict in zip(pending, verdicts):
+            if verdict:
+                approved.append(item)
+                print(f"FOOTAGE RECOVERY: approved {len(approved)}/{first.MIN_SHOTS}, stock {item['id']}", flush=True)
+            else:
+                item["path"].unlink(missing_ok=True)
+        pending = []
+
     for position, candidate in enumerate(pool):
         if checked >= MAX_CHECKED or len(approved) >= first.MIN_SHOTS:
             break
@@ -96,23 +119,10 @@ def review_replacements(topic: str, queries: tuple[str, ...]):
         fingerprints.append(clip["fingerprint"])
         pending.append(clip)
         checked += 1
-        if len(pending) < 2 and checked < MAX_CHECKED and position < len(pool) - 1:
-            continue
-        verdicts = first._vision(topic, pending)
-        for item, verdict in zip(pending, verdicts):
-            if verdict:
-                approved.append(item)
-                print(f"FOOTAGE RECOVERY: approved {len(approved)}/{first.MIN_SHOTS}, stock {item['id']}", flush=True)
-            else:
-                item["path"].unlink(missing_ok=True)
-        pending = []
+        if len(pending) >= REVIEW_BATCH_SIZE:
+            review_pending()
     if pending and len(approved) < first.MIN_SHOTS:
-        verdicts = first._vision(topic, pending)
-        for item, verdict in zip(pending, verdicts):
-            if verdict:
-                approved.append(item)
-            else:
-                item["path"].unlink(missing_ok=True)
+        review_pending()
     if len(approved) < first.MIN_SHOTS:
         print(f"FOOTAGE RECOVERY: only {len(approved)} independently approved after {checked} reviewed; no unsafe fallback", flush=True)
         return None
