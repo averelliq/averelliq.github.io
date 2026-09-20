@@ -19,6 +19,7 @@ FORMATS = {
         ("how glassblowers shape hot glass", ("glass blowing workshop", "glassblower shaping glass", "glass blowing closeup", "glass blowing furnace", "hot glass artist", "hand blown glass", "glassblower making vase", "glass blowing molten glass", "glass working studio")),
         ("how a chef makes handmade pasta", ("fresh pasta making", "pasta dough rolling", "chef making pasta", "handmade pasta cutting", "pasta making close up")),
         ("how a carpenter makes wooden furniture", ("carpenter woodworking workshop", "wood sanding closeup", "wood cutting carpenter", "wood furniture making")),
+        ("how a steel gear is made", ("metal gear manufacturing", "steel gear machining", "gear cutting machine", "industrial gear production", "metal gear cnc cutting", "gear hobbing machine", "gear teeth milling", "machined metal gears", "gear factory machinery", "metal gear inspection", "industrial machine gears", "gear machining closeup")),
     )),
     "everyday": ("RAW TO FINISHED", (
         ("how grapes become fresh juice", ("fresh grapes harvesting", "washing fresh grapes", "grapes pressing juice", "grapes crushing juice", "fresh grape juice pouring", "grape juice making", "grapes juicing", "grape juice glass", "grape processing")),
