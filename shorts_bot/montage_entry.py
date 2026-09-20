@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import creator_guard
+import cta_overlay
 import editorial_upgrade
 import footage_first
 import footage_pool_fix
@@ -43,12 +44,14 @@ def main() -> None:
     footage_script_fix.install()
     process_formats.install()
     state = montage_fx.install(quality_entry)
+    cta_overlay.install(quality_entry, state)
     quality_entry.upgrade.main()
     print(
         "MONTAGE FX: "
         f"motion_clips={state['motion_clips']}, "
         f"animated_captions={state['animated_captions']}, "
         f"original_music={state['original_music']}, "
+        f"cta_overlay={state['cta_overlay']}, "
         "footage_first=True, process_formats=made/works/transformation, "
         "real_footage=True, native_HD_source=True, original_script=True, "
         "short_titles=True, hashtags_in_description=False, duplicate_guard=True",
