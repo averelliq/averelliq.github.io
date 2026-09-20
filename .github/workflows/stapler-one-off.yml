@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: global-shorts-bot
+  group: original-stapler-one-off
   cancel-in-progress: false
 jobs:
   create-and-publish:
