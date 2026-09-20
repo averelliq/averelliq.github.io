@@ -44,7 +44,7 @@ jobs:
           import json, os
           from pathlib import Path
           request = json.loads(Path('shorts_bot/pottery_preview_request.json').read_text())
-          assert request['topic'] == 'how a potter shapes a clay bowl on a wheel'
+          assert request['topic'] == 'how a potter shapes clay on a spinning wheel'
           assert request['preview_only'] is True
           assert os.environ['SHORTS_SKIP_UPLOAD'] == '1'
           assert os.environ['PEXELS_API_KEY']
