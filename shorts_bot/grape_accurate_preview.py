@@ -1,8 +1,7 @@
-"""Grape-to-juice visual explanation, using ONLY seven verified Pexels grape videos.
+"""Grape-to-juice visual explanation with seven Pexels grape-only source videos.
 
-Grape juice is released before any fermentation; winemaking pressing footage is
-used ONLY to illustrate actual crushing, never presented as bottled fresh juice.
-No automatic upload. Final footage and captions need separate visual review.
+The pressing footage illustrates liquid release BEFORE fermentation, not wine
+as finished juice. Never auto-upload: exact MP4 and 21 frames need human review.
 """
 from __future__ import annotations
 
@@ -20,23 +19,27 @@ import upgrade
 TOPIC = 'how grapes become fresh juice'
 TITLE = 'How Grapes Release Juice'
 DESCRIPTION = 'From picked grapes to the liquid inside—see what pressure does.'
-CLIP_IDS = (5528415, 9947667, 28551137, 5944609, 35149891, 10505043, 9020878)
+# The original fourth Pexels video (5944609) has no native-HD download option.
+# 5945034 is already independently retrieved in our previous Pexels preview,
+# and depicts a person handling a bunch of actual grapes.
+CLIP_IDS = (5528415, 9947667, 28551137, 5945034, 35149891, 10505043, 9020878)
 SPEECH = (
     'Grape juice starts with ripe grapes picked from the vine.',
     'Harvesters carefully pick bunches of fruit from the plant.',
     'The harvested grapes are gathered and carried for processing.',
-    'The fruit is checked and handled before it is pressed.',
+    'The person handles individual grapes, still attached to the bunch.',
     'In larger facilities, conveyors help move grapes through processing.',
     'Crushing the fruit releases grape liquid, before any fermentation happens.',
     'Even a hand squeeze shows it: pressure breaks grapes and their juice escapes.',
 )
-CAPTIONS = ('Picked grapes', 'Harvesting', 'Collected fruit', 'Preparing grapes',
+CAPTIONS = ('Picked grapes', 'Harvesting', 'Collected fruit', 'Handling grapes',
             'Processing', 'Press to release', 'Juice comes out')
 
 
 def selected_clips():
     key = os.environ.get('PEXELS_API_KEY','').strip()
-    if not key: raise RuntimeError('Missing licensed video source credentials')
+    if not key:
+        raise RuntimeError('Missing licensed video source credentials')
     results = []
     for identifier in CLIP_IDS:
         response = requests.get(f'https://api.pexels.com/v1/videos/videos/{identifier}',
@@ -50,7 +53,7 @@ def selected_clips():
             raise ValueError(f'Grape-only source {identifier} lacks genuine native-HD provenance')
         results.append({'id':identifier,'query':'grape pressing harvested grape fruit',
                         'url':url,'links':options})
-    print('GRAPE PREVIEW: all seven grape-only Pexels video IDs obtained by exact source lookup',flush=True)
+    print('GRAPE PREVIEW: seven source-verified native-HD Pexels grape videos ready',flush=True)
     return results
 
 
@@ -76,7 +79,8 @@ def main():
     plan.update(title=TITLE, description=DESCRIPTION,
                 tags=['grapes','juice','how it works','fruit'],batch_topic='grapes')
     plan_path.write_text(json.dumps(plan,indent=2,ensure_ascii=False),encoding='utf-8')
-    print('GRAPE PREVIEW READY: check 21 genuine frames and MP4 before publication',flush=True)
+    print('GRAPE PREVIEW READY: check exact MP4 and actual 21 frames before release',flush=True)
 
 
-if __name__ == '__main__':main()
+if __name__ == '__main__':
+    main()
