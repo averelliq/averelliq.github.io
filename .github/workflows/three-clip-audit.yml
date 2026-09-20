@@ -1,0 +1,38 @@
+name: CurioRush Inspect Three Subject Clip Candidates
+
+on:
+  push:
+    paths:
+      - 'shorts_bot/three_clip_audit_request.json'
+permissions:
+  contents: read
+jobs:
+  audit:
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        topic: [glass, typewriter, grapes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SHORTS_BATCH_TOPIC: ${{ matrix.topic }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install metadata requester
+        run: pip install 'requests>=2.31,<3'
+      - name: Fetch candidate source metadata and real thumbnails, no upload
+        run: PYTHONPATH=shorts_bot python -u shorts_bot/three_clip_audit.py
+      - name: Save source thumbnails and IDs for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: curiorush-audit-${{ matrix.topic }}-${{ github.run_id }}
+          path: shorts_bot/output/clip_audit/${{ matrix.topic }}
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 0
