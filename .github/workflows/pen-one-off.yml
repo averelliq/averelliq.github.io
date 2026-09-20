@@ -20,7 +20,7 @@ jobs:
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
       PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      MECHANISM_VISION_MODEL: gemini-2.5-flash
+      MECHANISM_VISION_MODEL: gemini-3.5-flash-lite
       TTS_VOICE: am_michael
       ZIPPER_ONE_OFF_PUBLISH: '1'
       MECHANISM_PUBLISH: '1'
