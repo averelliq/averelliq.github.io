@@ -1,0 +1,13 @@
+{
+  "source_run_id": 35482216058,
+  "approved_videos": [
+    {
+      "name": "blacksmith",
+      "topic": "how a blacksmith forges hot metal",
+      "title": "How Blacksmiths Shape Metal",
+      "description": "Heat and hammer blows transform metal, one strike at a time.",
+      "mp4_sha256": "41d796b4d304eab5200d14537a316b66f6ded8e874ddf80556bd6cf740981299",
+      "approved_after_visual_review": true
+    }
+  ]
+}
