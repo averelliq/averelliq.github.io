@@ -12,6 +12,7 @@ import hd_footage_guard
 import live_action_guard
 import quality_entry
 import montage_fx
+import process_formats
 import resilient_plan_guard
 import safe_captions
 import stock_recovery
@@ -40,6 +41,7 @@ def main() -> None:
     footage_pool_fix.install()
     footage_first.install()
     footage_script_fix.install()
+    process_formats.install()
     state = montage_fx.install(quality_entry)
     quality_entry.upgrade.main()
     print(
@@ -47,7 +49,8 @@ def main() -> None:
         f"motion_clips={state['motion_clips']}, "
         f"animated_captions={state['animated_captions']}, "
         f"original_music={state['original_music']}, "
-        "footage_first=True, real_footage=True, native_HD_source=True, original_script=True, "
+        "footage_first=True, process_formats=made/works/transformation, "
+        "real_footage=True, native_HD_source=True, original_script=True, "
         "short_titles=True, hashtags_in_description=False, duplicate_guard=True",
         flush=True,
     )
