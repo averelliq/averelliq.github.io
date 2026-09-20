@@ -52,9 +52,10 @@
     "topic": "how bakers knead bread dough",
     "mp4_sha256": "235ac45a4d4ff0843612a304abd5b49b0990be429f99223c3e22b0be288bb5ce",
     "title": "Why Bakers Knead Dough",
-    "state": "publishing",
+    "state": "published",
     "source_run_id": "35482613532",
     "publish_run_id": "35482961636",
-    "at": "2026-09-20T02:04:04.985539+00:00"
+    "at": "2026-09-20T02:04:08.940360+00:00",
+    "video_id": "yo-kTFSG8Cs"
   }
 ]
