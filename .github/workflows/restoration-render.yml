@@ -1,14 +1,14 @@
-name: Restoration Shorts - Render reviewed footage
+name: Restoration Shorts - Render reviewed example-style footage
 
 on:
   workflow_dispatch:
     inputs:
       manifest:
-        description: 'Path inside restoration-shorts-bot/approved/, e.g. approved/my-restoration.json'
+        description: 'Reviewed JSON in restoration-shorts-bot/approved/, e.g. approved/my-restoration.json'
         required: true
         type: string
       upload_private:
-        description: 'Upload as PRIVATE using existing same-repository YouTube OAuth credentials'
+        description: 'Upload PRIVATE only, using confirmed same-repository YouTube credentials'
         required: true
         type: boolean
         default: false
@@ -28,12 +28,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install free render dependencies
+      - name: Install render dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y ffmpeg
           python -m pip install -r requirements.txt
-      - name: Render and optionally upload privately
+      - name: Run example-style validation tests
+        run: python -m unittest discover -s tests -v
+      - name: Render chronological before-work-after Shorts and optionally upload privately
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
@@ -43,23 +45,23 @@ jobs:
           UPLOAD_PRIVATE: ${{ inputs.upload_private }}
         run: |
           if [ -z "$PEXELS_API_KEY" ]; then
-            echo 'PEXELS_API_KEY is not available in this repository.' >&2
+            echo 'PEXELS_API_KEY is unavailable in this GitHub repository.' >&2
             exit 1
           fi
           if [ "$UPLOAD_PRIVATE" = 'true' ]; then
             if [ -z "$YT_CLIENT_ID" ] || [ -z "$YT_CLIENT_SECRET" ] || [ -z "$YT_REFRESH_TOKEN" ]; then
-              echo 'YouTube OAuth credentials are not available under the expected secret names in this repository. Existing credentials in another repo are not automatically shared.' >&2
+              echo 'YouTube OAuth secret names not present here. Do not copy secrets into source code.' >&2
               exit 1
             fi
-            python bot.py render --manifest "$MANIFEST" --upload-private
+            python style_bot.py render --manifest "$MANIFEST" --upload-private
           else
-            python bot.py render --manifest "$MANIFEST"
+            python style_bot.py render --manifest "$MANIFEST"
           fi
-      - name: Preserve video and review report
+      - name: Save MP4, factual narration and source credit
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: restoration-preview
+          name: restoration-example-style-preview
           path: |
             restoration-shorts-bot/output/short.mp4
             restoration-shorts-bot/output/script.txt

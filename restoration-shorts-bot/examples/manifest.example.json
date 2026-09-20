@@ -1,16 +1,24 @@
 {
   "source": "pexels",
   "pexels_video_id": 0,
-  "title": "Watch This Rusty Tool Get Restored #Shorts",
-  "item": "rusty tool",
+  "title": "Rusty Iron Restoration #Shorts",
+  "item": "rusty iron",
   "observed_steps": [
-    "the restorer brushes away loose rust",
-    "the metal surface is carefully polished",
-    "the restored parts are put back together"
+    "the restorer removes loose rust from the iron",
+    "the corroded metal is sanded and cleaned",
+    "a new wooden handle is shaped and attached"
   ],
-  "start_seconds": 0,
   "target_seconds": 45,
+  "segments": [
+    {"stage": "before", "start_seconds": 0, "duration_seconds": 4},
+    {"stage": "process", "start_seconds": 5, "duration_seconds": 34},
+    {"stage": "after", "start_seconds": 52, "duration_seconds": 7}
+  ],
   "visible_before_and_after": false,
+  "rusty_or_worn_start": false,
+  "hands_on_restoration": false,
+  "same_object_in_final": false,
+  "moving_footage": false,
   "burned_in_captions_or_watermark": null,
   "human_reviewed": false,
   "rights_reviewed": false

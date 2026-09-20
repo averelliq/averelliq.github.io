@@ -1,4 +1,4 @@
-name: Restoration Shorts - Discover footage
+name: Restoration Shorts - Example-style discovery
 
 on:
   push:
@@ -16,7 +16,7 @@ permissions:
 jobs:
   discover:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 18
     defaults:
       run:
         working-directory: restoration-shorts-bot
@@ -25,19 +25,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Verify existing Pexels connection and discover candidates
+      - name: Test example-style selection rules
+        run: python -m unittest discover -s tests -v
+      - name: Search rusty-object full-restoration metadata
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: |
           if [ -z "$PEXELS_API_KEY" ]; then
-            echo 'PEXELS_API_KEY not available in this repository. Check existing repo or organization secret scope.' >&2
+            echo 'Existing PEXELS_API_KEY is unavailable in this GitHub repository.' >&2
             exit 1
           fi
-          python bot.py discover
-      - name: Save candidates for footage and rights review
+          python style_bot.py discover
+      - name: Save clickable previews and honest review report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: restoration-review-candidates
-          path: restoration-shorts-bot/output/candidates.json
-          if-no-files-found: error
+          name: restoration-example-style-candidates
+          path: |
+            restoration-shorts-bot/output/candidates.json
+            restoration-shorts-bot/output/review_report.json
+            restoration-shorts-bot/output/review_gallery.html
+          if-no-files-found: warn
           retention-days: 7
