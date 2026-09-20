@@ -87,5 +87,14 @@
     "publish_run_id": "35490841877",
     "at": "2026-09-20T05:07:29.615280+00:00",
     "video_id": "gStFKT25MDI"
+  },
+  {
+    "topic": "how an old typewriter types letters",
+    "mp4_sha256": "40f62cf2a2eb7383eba2525affaa176e796f44231e5ceb7508507c0fcb83b5bd",
+    "title": "Inside a Typewriter",
+    "state": "publishing",
+    "source_run_id": "35490586836",
+    "publish_run_id": "35490841877",
+    "at": "2026-09-20T05:07:32.282511+00:00"
   }
 ]
