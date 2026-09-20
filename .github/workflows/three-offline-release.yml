@@ -1,4 +1,4 @@
-name: Publish Reviewed Three CurioRush Shorts
+name: Publish Reviewed CurioRush Glass and Typewriter Shorts
 
 on:
   push:
@@ -23,13 +23,13 @@ jobs:
       YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
     steps:
-      - name: Checkout exact approved MP4 hashes
+      - name: Checkout reviewed SHA256 approval
         uses: actions/checkout@v4
-      - name: Retrieve all three exact preview artifacts
+      - name: Retrieve exact curated source-backed MP4 artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: curiorush-three-*-35490083726
-          run-id: 35490083726
+          pattern: curiorush-curated-*-35490586836
+          run-id: 35490586836
           github-token: ${{ github.token }}
           path: shorts_bot/three_offline_reviewed
           merge-multiple: false
@@ -40,13 +40,13 @@ jobs:
           python -m pip install 'requests>=2.31,<3' 'google-api-python-client>=2.100,<3' 'google-auth>=2.20,<3'
           python -m pip check
           python -m py_compile shorts_bot/publish_three_offline.py
-      - name: Verify each approved MP4 and publish original once
+      - name: Validate each exact MP4, reserve once and publish to YouTube
         run: python -u shorts_bot/publish_three_offline.py
-      - name: Save YouTube publication receipts
+      - name: Save confirmed YouTube receipts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: curiorush-three-youtube-receipts-${{ github.run_id }}
+          name: curiorush-reviewed-youtube-receipts-${{ github.run_id }}
           path: shorts_bot/three_offline_reviewed/publication_receipts.json
           if-no-files-found: ignore
           retention-days: 30
