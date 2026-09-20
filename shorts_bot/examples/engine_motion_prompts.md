@@ -1,0 +1,21 @@
+# Rusty engine restoration — actual-motion video prompts
+
+**Status: production instructions, not finished footage.** No clips, finished MP4, or YouTube upload are implied by this file. These prompts can be used in an accessible free text-to-video tool; downloading or assembling clips requires tools and creator access that are actually available. Never substitute still-photo zooms for the hands-on actions requested by the channel owner.
+
+## Locked visual continuity
+Small vintage single-cylinder gasoline engine; olive-green crankcase; large round flywheel on the right; scuffed steel workbench; mechanic's dark navy work gloves; same garage and right-hand side of engine throughout. Vertical 9:16, photorealistic, tripod macro footage, visible physical contact and cause/effect, natural gravity; no text, no impossible morphing or magical assembly. AI-generated reconstruction must not be passed off as documentary footage.
+
+## Eight five-second shots / 40 seconds total
+
+1. **00–05 — Hook / brushing rust.** The rusty engine fills frame. Both gloved hands hold a stiff wire brush against a rusty EXTERIOR bracket. Repeated short, forceful physical strokes; bristles bend, loose orange rust flakes fall, dull gray metal is revealed ONLY where the brush contacts it. No static-photo pan or instantaneous cleaning.
+2. **05–10 — Inspect and remove screws.** Same engine, same gloves. Close-up of the mechanic marking the location of an exterior cover and turning two visible cover screws counterclockwise with a correctly sized driver; each screw rotates and rises, then is laid on a magnetic tray. The cover remains in place until both screws are out.
+3. **10–15 — Lift and clean.** The mechanic lifts the now-unfastened exterior cover, showing its genuinely dirty underside, places it flat on the bench and wipes away oil with a cloth. No magically appearing parts, and no dirt transfer without contact.
+4. **15–20 — Remove remaining exterior corrosion.** Same removed cover under the same hands. A hand scrubs rust on the cover's OUTSIDE surface; rust debris falls and the finish visibly changes progressively. Do not scrape precision bearing seats or mating faces.
+5. **20–25 — Inspect/replace worn seal.** Hands remove one visibly worn accessible exterior gasket, compare it with a matching new gasket, and correctly seat the matching replacement. Do not show unverified internal engine repair or invent brand-specific torque values.
+6. **25–30 — Reassemble.** Mechanic aligns the SAME cleaned cover to its SAME mounting holes, seats it, and turns the SAME screws clockwise; tools and screws retain their shape and positions. No instant assembly.
+7. **30–35 — Final checks.** Mechanic checks the reassembled cover for leaks and adds oil only where applicable to the engine-specific maintenance sequence. Visible fingers and tools move and interact with objects. Overlay 'LIKE + SUBSCRIBE' on 34–37 seconds during editing, not AI generation.
+8. **35–40 — Result.** SAME engine in SAME garage. Realistic hand turns the starter control, the flywheel begins rotating and remains spinning; engine vibration and original mechanical sound are in sync. Show the final engine running ONLY if a safe, mechanically valid start is supported by the final footage. The CTA persists to second 37, then disappears.
+
+**English voice script (~80 words; pace to fit actual picture):** 'This rusty little engine is getting a second life. First, we brush away loose rust and check the parts. Next, the cover screws come out, and the greasy cover gets cleaned. We treat exterior corrosion, inspect the old seal, and fit a matching replacement. Now the same cover goes back on, one screw at a time. After the proper oil and safety checks, we test the engine. Watch that flywheel move! Like and subscribe for more transformations.'
+
+**Final assembly gates:** eight licensed five-second moving clips of the SAME recognizable machine, 1080×1920 export at 30 fps and 40.0 s, no silent/fake voice, audible machine motion, 34–37 s LIKE + SUBSCRIBE visible in actual MP4, caption and physical continuity checked, AI disclosure when realistic AI footage is used, private YouTube upload only after real OAuth authorization and passing QC. Current GitHub workflow is QC/demo-only; it does NOT implement actual YouTube publication. Do not use a fake success message.
