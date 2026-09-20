@@ -25,11 +25,11 @@ jobs:
     steps:
       - name: Checkout release validation script
         uses: actions/checkout@v4
-      - name: Download the exact reviewed video from original successful preview
+      - name: Download exact corrected preview artifact
         uses: actions/download-artifact@v4
         with:
-          name: espresso-review-35479684193
-          run-id: 35479684193
+          name: espresso-review-35479892366
+          run-id: 35479892366
           github-token: ${{ github.token }}
           path: shorts_bot/reviewed_espresso_artifact
       - name: Set up Python
@@ -42,7 +42,7 @@ jobs:
           sudo apt-get install -y ffmpeg
           python -m pip install 'requests>=2.31,<3' 'google-api-python-client>=2.100,<3' 'google-auth>=2.20,<3'
           python -m pip check
-      - name: Validate exact previously reviewed MP4 and publish it publicly once
+      - name: Validate exact corrected MP4 and publish it publicly once
         run: python -u shorts_bot/publish_reviewed_espresso.py
       - name: Preserve upload receipt
         if: always()
