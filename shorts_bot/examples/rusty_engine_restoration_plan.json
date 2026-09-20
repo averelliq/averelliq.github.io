@@ -1,0 +1,38 @@
+{
+  "title": "How a Rusty Engine Is Restored",
+  "language": "en",
+  "duration": 40.0,
+  "synthetic_content": false,
+  "realistic_ai": false,
+  "ai_disclosure": false,
+  "research": {
+    "status": "awaiting_verified_footage_and_engine_specific_procedure",
+    "sources": [],
+    "note": "Storyboard only. Do not claim the depicted restoration is real until the actual sequence is checked against footage and the relevant engine's service manual."
+  },
+  "voiceover": "Watch this rusty engine come back to life. First, we record every connection and check for damage. With the power disconnected, the engine comes apart piece by piece. Grease is removed and the rusty outer surfaces are cleaned, keeping abrasive tools away from precision parts. Worn seals and damaged components are replaced with compatible parts. Everything goes back in the right order, with bolts tightened to the specified torque. Fresh oil goes in before the first start. Finally, we check for leaks and listen to the engine run. Like and subscribe for more restorations.",
+  "voiceover_status": "script_only_natural_english_recording_not_yet_available",
+  "cta": {
+    "text": "LIKE + SUBSCRIBE",
+    "start": 34,
+    "end": 37,
+    "position": "top-center"
+  },
+  "scenes": [
+    {"start": 0, "end": 2, "label": "RUSTY ENGINE", "action": "Open with a genuine moving close-up of the engine in its original rusty condition; no still-photo pan masquerading as hands-on restoration", "object_before": "Original rusty engine", "object_after": "Original rusty engine", "source": "shorts_bot/media/engine_01.mp4", "license": "unknown"},
+    {"start": 2, "end": 5, "label": "INSPECT", "action": "Show inspection and documenting real wiring, hoses and damage before removal", "object_before": "Uninspected engine", "object_after": "Connections and issues documented", "source": "shorts_bot/media/engine_02.mp4", "license": "unknown"},
+    {"start": 5, "end": 10, "label": "DISASSEMBLE", "action": "Show real hands disconnecting power and removing actual engine parts in a mechanically coherent order", "object_before": "Engine assembled", "object_after": "Selected components removed", "source": "shorts_bot/media/engine_03.mp4", "license": "unknown"},
+    {"start": 10, "end": 15, "label": "DEGREASE", "action": "Show actual scrubbing and wiping of accessible surfaces, not a static image with a camera zoom", "object_before": "Greasy exposed surfaces", "object_after": "Degreased accessible surfaces", "source": "shorts_bot/media/engine_04.mp4", "license": "unknown"},
+    {"start": 15, "end": 20, "label": "REMOVE RUST", "action": "Show actual rust removal on suitable exterior parts only; avoid abrasive treatment of precision mating surfaces", "object_before": "Exterior corrosion", "object_after": "Exterior corrosion treated", "source": "shorts_bot/media/engine_05.mp4", "license": "unknown"},
+    {"start": 20, "end": 26, "label": "REPLACE PARTS", "action": "Show genuine replacement of worn gaskets, seals, or other confirmed damaged compatible parts", "object_before": "Worn parts documented", "object_after": "Compatible replacements installed", "source": "shorts_bot/media/engine_06.mp4", "license": "unknown"},
+    {"start": 26, "end": 32, "label": "REASSEMBLE", "action": "Show hands fitting components and tightening fasteners to the engine maker's torque specification", "object_before": "Engine partly disassembled", "object_after": "Engine reassembled", "source": "shorts_bot/media/engine_07.mp4", "license": "unknown"},
+    {"start": 32, "end": 37, "label": "FIRST START", "action": "Show actual oil fill, safe first start and leak checks only if supported by the footage; CTA overlays at seconds 34–37", "object_before": "Reassembled engine awaiting checks", "object_after": "Initial checks completed", "source": "shorts_bot/media/engine_08.mp4", "license": "unknown"},
+    {"start": 37, "end": 40, "label": "RESTORED", "action": "Show the SAME engine running in its genuine finished state, with synchronized original machine sound", "object_before": "Engine after initial checks", "object_after": "Restored engine running", "source": "shorts_bot/media/engine_09.mp4", "license": "unknown"}
+  ],
+  "youtube": {
+    "title": "How a Rusty Engine Is Restored",
+    "description": "From rust and grime to a carefully reassembled engine. Watch the restoration process, part by part. #EngineRestoration #HowItsMade #Shorts",
+    "publish": false
+  },
+  "publication_gate": "NO UPLOAD until nine real motion clips are sourced and their rights verified; engine-specific process checked; natural English voice recording added; full MP4 visually reviewed; QC passes; YouTube upload is implemented and authorized."
+}
