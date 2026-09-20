@@ -26,14 +26,12 @@ def main() -> None:
     opening[4] = "How espresso starts"
     shots[0] = tuple(opening)
     steam = list(shots[3])
-    steam[3] = "Watch the flow continue as fresh espresso collects in the cup."
-    steam[4] = "The extraction continues"
+    steam[3] = "A clean cup waits beneath the portafilter for the next espresso pour."
+    steam[4] = "The cup waits below"
     shots[3] = tuple(steam)
     preview.SHOTS = tuple(shots)
-    # quality_entry wraps upgrade's actual renderer with an additional Gemini
-    # final visual check. That external service is quota-blocked. For PREVIEW
-    # ONLY run the ORIGINAL renderer, which still invokes upgrade.check_video,
-    # then export frames for direct visual inspection before any publication.
+    # Preview only: run the underlying decoder-checked renderer and export
+    # actual encoded scene frames for direct inspection before publication.
     upgrade.aligned_build_video = quality_entry._original_build
     print("PREVIEW NOTE: Independent final Gemini visual check unavailable; "
           "manual audiovisual review of exported MP4 required BEFORE publishing.", flush=True)
@@ -50,6 +48,8 @@ def main() -> None:
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     if "portafilter goes into place" not in plan["scenes"][0]["voiceover"]:
         raise ValueError("First scene still contains inaccurate grinding claim")
+    if "cup waits beneath" not in plan["scenes"][3]["voiceover"]:
+        raise ValueError("Empty-cup shot still contains inaccurate extraction claim")
     (out / "manual_review_required.txt").write_text(
         "Format/decoder tests PASSED; independent final Gemini visual review NOT RUN. "
         "Review the actual MP4 picture, subtitles and narration before public release.\n",
