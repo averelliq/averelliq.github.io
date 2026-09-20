@@ -5,6 +5,7 @@ import creator_guard
 import editorial_upgrade
 import footage_first
 import footage_pool_fix
+import footage_script_fix
 import footage_review_fix
 import gemini_transient_guard
 import hd_footage_guard
@@ -38,6 +39,7 @@ def main() -> None:
     footage_review_fix.install()
     footage_pool_fix.install()
     footage_first.install()
+    footage_script_fix.install()
     state = montage_fx.install(quality_entry)
     quality_entry.upgrade.main()
     print(
