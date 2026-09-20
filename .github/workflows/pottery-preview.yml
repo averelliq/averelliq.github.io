@@ -51,7 +51,7 @@ jobs:
           print('Pottery MP4 preview only; uploading disabled.', flush=True)
           PY
       - name: Find distinct HD pottery shots and render a preview for audiovisual review
-        run: PYTHONPATH=shorts_bot python -u shorts_bot/pottery_preview_entry.py
+        run: PYTHONPATH=shorts_bot python -u shorts_bot/pottery_manual_review_entry.py
       - name: Save the exact MP4, source manifest and 21 scene frames
         if: always()
         uses: actions/upload-artifact@v4
