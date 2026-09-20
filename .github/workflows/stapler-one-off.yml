@@ -18,6 +18,9 @@ jobs:
       YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
       YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      MECHANISM_VISION_MODEL: gemini-2.5-flash
       TTS_VOICE: am_michael
       ZIPPER_ONE_OFF_PUBLISH: '1'
       MECHANISM_PUBLISH: '1'
@@ -39,20 +42,21 @@ jobs:
           sudo apt-get install -y ffmpeg espeak-ng libsndfile1 fonts-dejavu-core
           python -m pip install -r shorts_bot/requirements.txt pillow
           python -m pip check
-      - name: Validate original stapler animation
+      - name: Validate mechanism drawing and photographic production code
         run: |
-          python -m py_compile shorts_bot/two_mechanisms.py shorts_bot/zipper_short.py
+          python -m py_compile shorts_bot/two_mechanisms.py shorts_bot/zipper_short.py shorts_bot/mechanism_photo_entry.py
           python - <<'PY'
           import sys
           sys.path.insert(0,'shorts_bot')
           import two_mechanisms as m
+          import mechanism_photo_entry as photos
           assert sum(len(s[1].split()) for s in m.STAPLER)>=65
           img=m.make_frame('stapler')(16,28,[i*3.5 for i in range(9)])
-          assert img.size==(540,960) and m.CONFIG['stapler'][1]!=m.CONFIG['pen'][1]
-          print('Original stapler render and CTA tests passed')
+          assert img.size==(540,960) and photos.MIN_APPROVED>=4
+          print('Stapler animation and photo-required entrypoint validated')
           PY
-      - name: Render verify and upload public stapler Short
-        run: python shorts_bot/two_mechanisms.py
+      - name: Require verified real photographs, render MP4, inspect encoded scenes and publish
+        run: python shorts_bot/mechanism_photo_entry.py
       - name: Preserve MP4 and verified upload result
         if: always()
         uses: actions/upload-artifact@v4
