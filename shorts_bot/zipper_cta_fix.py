@@ -1,8 +1,8 @@
-"""Publish a corrected zipper Short with a legible on-screen call to action.
+"""Publish the corrected zipper Short with a legible on-screen call to action.
 
-The old renderer showed LIKE + SUBSCRIBE at the very bottom for two seconds,
-where YouTube's interface can cover it. Keep the original video and audio
-checks; show a large graphic higher up in the frame instead.
+The original renderer showed LIKE + SUBSCRIBE at the bottom for only two
+seconds, where YouTube Shorts interface can cover it. Preserve the existing
+narration and render checks; show a bigger graphic above the bottom controls.
 """
 from __future__ import annotations
 
