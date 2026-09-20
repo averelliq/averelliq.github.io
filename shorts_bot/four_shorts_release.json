@@ -1,0 +1,29 @@
+{
+  "source_run_id": 35482613532,
+  "approved_videos": [
+    {
+      "name": "bread",
+      "topic": "how bakers knead bread dough",
+      "title": "Why Bakers Knead Dough",
+      "description": "Fold, press, repeat. See dough change under skilled hands.",
+      "mp4_sha256": "235ac45a4d4ff0843612a304abd5b49b0990be429f99223c3e22b0be288bb5ce",
+      "approved_after_visual_review": true
+    },
+    {
+      "name": "sewing",
+      "topic": "how a sewing machine joins fabric",
+      "title": "How Sewing Machines Stitch",
+      "description": "Watch a needle and thread turn fabric into a seam.",
+      "mp4_sha256": "28d744905637ea5a6617c2727e9e4379060e8e0675a9cd415ec0eb08c35aa214",
+      "approved_after_visual_review": true
+    },
+    {
+      "name": "sushi",
+      "topic": "how sushi chefs roll sushi",
+      "title": "How Sushi Rolls Are Made",
+      "description": "A close look at the hands behind a sushi roll.",
+      "mp4_sha256": "378840f12c047867d50b5dbc538732281b9ae180ad8dcf336e69e83107334306",
+      "approved_after_visual_review": true
+    }
+  ]
+}
