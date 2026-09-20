@@ -1,0 +1,28 @@
+name: Restoration Shorts - Setup self-test
+
+on:
+  push:
+    paths:
+      - '.github/workflows/restoration-*.yml'
+      - 'restoration-shorts-bot/long_to_short.py'
+      - 'restoration-shorts-bot/tests/test_long_to_short.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify code compiles
+        run: python -m py_compile restoration-shorts-bot/long_to_short.py
+      - name: Check timeline, aspect ratio and subtitle options
+        run: python -m unittest discover -s restoration-shorts-bot/tests -p 'test_long_to_short.py' -v
+      - name: Verify FFmpeg is available on the runner
+        run: ffmpeg -version | head -n 1
