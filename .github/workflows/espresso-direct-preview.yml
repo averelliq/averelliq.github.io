@@ -49,9 +49,9 @@ jobs:
           assert os.environ['PEXELS_API_KEY']
           print('Preview only; no YouTube upload action in this workflow', flush=True)
           PY
-      - name: Restore verified footage, narrate, render and check MP4
-        run: PYTHONPATH=shorts_bot python -u shorts_bot/espresso_direct_preview.py
-      - name: Save playable MP4, subtitles and eight review frames
+      - name: Restore footage, correct script, narrate, render and decode-check MP4
+        run: PYTHONPATH=shorts_bot python -u shorts_bot/espresso_manual_review_entry.py
+      - name: Save playable MP4 and independently inspectable scene frames
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -61,6 +61,7 @@ jobs:
             shorts_bot/output/plan.json
             shorts_bot/output/visual_sources.json
             shorts_bot/output/scene_*.jpg
+            shorts_bot/output/manual_review_required.txt
           if-no-files-found: warn
           retention-days: 7
           compression-level: 0
