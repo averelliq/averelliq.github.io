@@ -1,4 +1,4 @@
-name: Restoration Shorts - Example-style discovery
+name: Restoration Shorts - Candidate discovery
 
 on:
   push:
@@ -25,9 +25,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Test example-style selection rules
+      - name: Test restoration selection and review queue
         run: python -m unittest discover -s tests -v
-      - name: Search rusty-object full-restoration metadata
+      - name: Find possible restoration footage for human review
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: |
@@ -35,12 +35,12 @@ jobs:
             echo 'Existing PEXELS_API_KEY is unavailable in this GitHub repository.' >&2
             exit 1
           fi
-          python style_bot.py discover
-      - name: Save clickable previews and honest review report
+          python candidate_finder.py discover
+      - name: Save watchable links and review report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: restoration-example-style-candidates
+          name: restoration-review-leads
           path: |
             restoration-shorts-bot/output/candidates.json
             restoration-shorts-bot/output/review_report.json
