@@ -82,9 +82,10 @@
     "topic": "how glassblowers shape hot glass",
     "mp4_sha256": "b937847899a62d8315a83d50c3566b2435c1d481689b18415cebc1ef973c0a44",
     "title": "How Hot Glass Takes Shape",
-    "state": "publishing",
+    "state": "published",
     "source_run_id": "35490586836",
     "publish_run_id": "35490841877",
-    "at": "2026-09-20T05:07:24.990322+00:00"
+    "at": "2026-09-20T05:07:29.615280+00:00",
+    "video_id": "gStFKT25MDI"
   }
 ]
