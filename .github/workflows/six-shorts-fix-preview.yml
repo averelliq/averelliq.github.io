@@ -1,0 +1,58 @@
+name: Correct Four CurioRush Shorts Previews
+
+on:
+  push:
+    paths:
+      - 'shorts_bot/six_shorts_fix_request.json'
+
+permissions:
+  contents: read
+
+jobs:
+  render-corrected:
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        topic: [3d-printer, bread, sewing, sushi]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SHORTS_BATCH_TOPIC: ${{ matrix.topic }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      TTS_VOICE: am_michael
+      SHORTS_SKIP_UPLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: shorts_bot/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: kokoro-${{ runner.os }}-v1
+      - name: Install renderer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg espeak-ng libsndfile1
+          pip install -r shorts_bot/requirements.txt
+          pip check
+          python -m py_compile shorts_bot/six_shorts_fix_preview.py
+      - name: Render corrected MP4 without publishing
+        run: PYTHONPATH=shorts_bot python -u shorts_bot/six_shorts_fix_preview.py
+      - name: Save exact MP4 and visual review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: curiorush-six-${{ matrix.topic }}-${{ github.run_id }}
+          path: |
+            shorts_bot/output/short.mp4
+            shorts_bot/output/plan.json
+            shorts_bot/output/visual_sources.json
+            shorts_bot/output/scene_*.jpg
+            shorts_bot/output/manual_review_required.txt
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
