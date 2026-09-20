@@ -1,0 +1,17 @@
+{
+  "source": "pexels",
+  "pexels_video_id": 0,
+  "title": "Watch This Rusty Tool Get Restored #Shorts",
+  "item": "rusty tool",
+  "observed_steps": [
+    "the restorer brushes away loose rust",
+    "the metal surface is carefully polished",
+    "the restored parts are put back together"
+  ],
+  "start_seconds": 0,
+  "target_seconds": 45,
+  "visible_before_and_after": false,
+  "burned_in_captions_or_watermark": null,
+  "human_reviewed": false,
+  "rights_reviewed": false
+}

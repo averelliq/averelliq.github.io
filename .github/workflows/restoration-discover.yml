@@ -1,0 +1,43 @@
+name: Restoration Shorts - Discover footage
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/restoration-discover.yml'
+      - 'restoration-shorts-bot/**'
+  workflow_dispatch:
+  schedule:
+    - cron: '20 8 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: restoration-shorts-bot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify existing Pexels connection and discover candidates
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: |
+          if [ -z "$PEXELS_API_KEY" ]; then
+            echo 'PEXELS_API_KEY not available in this repository. Check existing repo or organization secret scope.' >&2
+            exit 1
+          fi
+          python bot.py discover
+      - name: Save candidates for footage and rights review
+        uses: actions/upload-artifact@v4
+        with:
+          name: restoration-review-candidates
+          path: restoration-shorts-bot/output/candidates.json
+          if-no-files-found: error
+          retention-days: 7
