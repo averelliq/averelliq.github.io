@@ -12,9 +12,10 @@
     "topic": "how an espresso machine brews coffee",
     "mp4_sha256": "d02ccba751c47c82c47e831e7d3ee9bbd2e866a4f70d256f971c72ddb36bdcef",
     "title": "How Espresso Really Works",
-    "state": "publishing",
-    "at": "2026-09-20T00:57:57.194779+00:00",
+    "state": "published",
+    "at": "2026-09-20T00:58:01.301571+00:00",
     "source_run_id": "35479892366",
-    "publish_run_id": "35480110705"
+    "publish_run_id": "35480110705",
+    "video_id": "75XKYjoTsGU"
   }
 ]
