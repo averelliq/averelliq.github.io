@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - shorts_bot/gear_short_request.json
+      - shorts_bot/gear_short_entry.py
 
 permissions:
   contents: write
@@ -27,8 +28,8 @@ jobs:
       YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
       YT_DATA_API_KEY: ${{ secrets.YT_DATA_API_KEY }}
       YOUTUBE_PRIVACY: public
-      GEMINI_MODEL: gemini-3.5-flash-lite
-      GEMINI_FALLBACK_MODELS: gemini-3.5-flash,gemini-3.6-flash
+      GEMINI_MODEL: gemini-3.6-flash
+      GEMINI_FALLBACK_MODELS: gemini-3.5-flash,gemini-3.5-flash-lite
       TTS_VOICE: am_michael
       SHORTS_THEME: history
       SHORTS_AI_REVIEW: '1'
@@ -64,13 +65,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r shorts_bot/requirements.txt
           pip check
-      - name: Validate code and reminder before production
+      - name: Validate code, model routing and reminder before production
         run: |
-          python -m py_compile shorts_bot/gear_short_entry.py shorts_bot/cta_overlay.py shorts_bot/montage_entry.py shorts_bot/process_formats.py
+          python -m py_compile shorts_bot/retry_runner.py shorts_bot/footage_pool_fix.py shorts_bot/gear_short_entry.py shorts_bot/cta_overlay.py shorts_bot/montage_entry.py shorts_bot/process_formats.py
           PYTHONPATH=shorts_bot python - <<'PY'
           import tempfile
           from pathlib import Path
           from cta_overlay import add_reminder
+          from retry_runner import _model_candidates
           with tempfile.TemporaryDirectory() as temp:
               path = Path(temp) / 'captions.ass'
               path.write_text('[V4+ Styles]\nStyle: Captions,DejaVu Sans\n[Events]\n', encoding='utf-8')
@@ -78,7 +80,10 @@ jobs:
               output = path.read_text(encoding='utf-8')
               assert 19 < start < 22 and end - start == 2.0
               assert 'Style: Reminder,' in output and 'LIKE  +  SUBSCRIBE' in output
-          print('CTA insertion smoke test passed')
+          url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent'
+          names = [name for name, _ in _model_candidates(url)]
+          assert names == ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite'], names
+          print('CTA + fallback routing smoke tests passed')
           PY
           ffmpeg -version | head -n 1
       - name: Produce, verify and upload original steel gear Short
