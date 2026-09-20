@@ -1,6 +1,0 @@
-requests==2.34.2
-numpy==2.4.6
-soundfile==0.14.0
-kokoro==0.9.4
-google-api-python-client==2.200.0
-google-auth==2.58.0
