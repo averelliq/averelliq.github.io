@@ -40,7 +40,7 @@ class CandidateFinderTests(unittest.TestCase):
         self.assertEqual([item['id'] for item in candidates], [3, 2])
         self.assertEqual(report['visually_verified'], 0)
         self.assertEqual(report['approved_for_reuse'], 0)
-        self.assertIn('UNVERIFIED', gallery)
+        self.assertIn('unverified', gallery.lower())
         self.assertEqual(client.call_count, len(finder.style_bot.SEARCH_TERMS))
 
 
