@@ -1,25 +1,20 @@
-# Restoration Shorts Bot — review-first prototype
+# Restoration Shorts — rusty-iron example style (v2)
 
-A browser-only GitHub Actions project for finding Pexels restoration footage, writing English narration and rendering vertical Shorts. It does **not** automatically publish publicly. No restoration video has yet been produced or uploaded.
+The target is the **user-supplied rusty iron restoration example**: show the old/rusted object immediately, moving close-up footage of real rust removal and hands-on repair, and a clear final reveal of the SAME object (preferably in use). Merely wiping metal, fixing a clock, a workshop scene, unrelated B-roll or a photo slideshow are **not** suitable.
 
-## Reusing your existing GitHub connections
+## GitHub/browser workflow
 
-This bot is in the **same** `averelliq/averelliq.github.io` repository, on the isolated `restoration-shorts-bot-v1` branch. After the proposed change is merged to `main`, the workflows at `.github/workflows/restoration-discover.yml` and `.github/workflows/restoration-render.yml` will be visible in Actions. Existing workflows and `main` remain untouched until that happens.
+The runnable files are at repository root `.github/workflows/restoration-discover.yml` and `.github/workflows/restoration-render.yml`. This folder adds `style_bot.py`; the legacy `bot.py` is left intact for compatibility. Existing KAYIP FREKANS and global Shorts workflows are unchanged. The new workflow uses the existing same-repository `PEXELS_API_KEY` *name*; it does not access or print the key.
 
-The existing KAYIP FREKANS workflow already references `secrets.PEXELS_API_KEY`. Restoration discovery reuses that exact secret name. This proves the old workflow *references* the name, not that a working secret is currently present: this GitHub connection cannot inspect the secret store.
+1. In GitHub **Actions → Restoration Shorts - Example-style discovery**, run the workflow (it also searches daily). Download the `restoration-example-style-candidates` artifact: `review_gallery.html` is a clickable preview gallery; `candidates.json` has original Pexels links and IDs; `review_report.json` states counts and uncertainty.
+2. Search terms focus on rusty tools, antique irons, axes, knives and restoration. An API result is retained only when its URL metadata **also** contains a restoration-related word and a worn-object/object word; generic metal grinding, workshop and clock-repair results without restoration metadata are excluded. The source may be 45–240 seconds to preserve the final reveal while editing a 40–50-second Short. **Metadata cannot confirm the video really matches the example. If there are zero candidates, the report honestly says zero.**
+3. Watch the ENTIRE source video and check: worn/rusty starting object; moving hands-on restoration; SAME object in the final reveal; clean footage; permitted reuse and credits. No automated computer-vision confirmation is claimed. Pexels footage is not automatically suitable for monetization merely because narration is replaced.
+4. Copy `examples/manifest.example.json` to `approved/my-restoration.json`, replace the intentionally invalid video ID `0` with a real approved Pexels ID, write only truly observed English steps, and enter verified chronological `segments`: 2–8s `before`, one or more `process` clips, 3–12s `after`. Their lengths must total the target (40–50s), must not overlap, and must fit the source footage. Only set the review flags true after checking.
+5. In **Actions → Restoration Shorts - Render reviewed example-style footage**, use manifest `approved/my-restoration.json`, leaving `upload_private=false` to inspect `restoration-example-style-preview`. The renderer joins the verified beginning, process and final in 1080×1920, removes separate source audio/subtitle streams, generates fresh English voiceover and checks duration/audio. It cannot remove text burned into video or guarantee ideal cropping on every object.
+6. An optional `upload_private=true` uploads **PRIVATE** via existing same-repository `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN`, if present and authorized for the intended channel. No automatic public posting. The GitHub connector cannot inspect OAuth secrets, permissions or target channel; no credentials have been copied. The user should review the private video before publishing.
 
-The rendering workflow references same-repository `secrets.YT_CLIENT_ID`, `secrets.YT_CLIENT_SECRET`, and `secrets.YT_REFRESH_TOKEN`. We cannot verify their presence, names, OAuth scope, or whether they point to the intended global Shorts channel. A credential configured only in another repository is not automatically shared. The existing Shorts workflow has an intentionally disabled YouTube publish step, so it is **not** evidence that OAuth is ready. No secrets have been copied, modified, printed or exposed.
+This project searches licensed Pexels footage rather than downloading and reuploading random YouTube videos. Real rights review remains necessary. These rules were unit-tested with mocked API results; a successful Pexels or YouTube production run must be checked separately.
 
-## Workflow
+Tests: `cd restoration-shorts-bot && python -m unittest discover -s tests -v`.
 
-1. Open **Actions → Restoration Shorts - Discover footage → Run workflow** (after merging to `main`). The workflow also searches once a day. It stores proposed 40–90-second Pexels footage in a `restoration-review-candidates` artifact.
-2. Watch each candidate and confirm that the visuals show an actual restoration with before-and-after, clean source footage without embedded captions or watermarks, and acceptable reuse rights. Pexels metadata alone cannot verify these.
-3. Add a truthful manifest inside `restoration-shorts-bot/approved/`, using `restoration-shorts-bot/examples/manifest.example.json` as a guide. Fill in a *real* video ID, observed English restoration steps, and required review flags. The example ID is deliberately invalid.
-4. Run **Actions → Restoration Shorts - Render reviewed footage → Run workflow** with input `approved/my-restoration.json`. The MP4, narration script and source information appear in the `restoration-preview` artifact. The output target is 1080×1920, 40–50 seconds.
-5. If same-repository YouTube OAuth credentials are confirmed to be valid for the *intended* channel, manually opt into `upload_private=true` to upload a **private** review video. The bot does not publish publicly.
-
-The renderer removes original audio and separate subtitle streams by remapping only the selected video stream and new narration. It cannot reliably erase burned-in subtitles, nor autonomously verify the actions depicted. Edge TTS availability may change. English narration does not automatically make someone else's footage original for YouTube monetization.
-
-Local optional tests: `cd restoration-shorts-bot && python -m unittest discover -s tests -v`.
-
-Useful references: https://www.pexels.com/api/documentation/ · https://www.pexels.com/license/ · https://support.google.com/youtube/answer/1311392 · https://developers.google.com/youtube/v3/docs/videos/insert
+References: https://www.pexels.com/api/documentation/ · https://www.pexels.com/license/ · https://support.google.com/youtube/answer/1311392
