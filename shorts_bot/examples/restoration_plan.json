@@ -1,0 +1,22 @@
+{
+  "title": "Restore a Rusty Hand Tool",
+  "language": "en",
+  "duration": 40.0,
+  "synthetic_content": false,
+  "research": {
+    "status": "replace_with_verified_sources",
+    "sources": []
+  },
+  "cta": {"text": "LIKE + SUBSCRIBE", "start": 34, "end": 37, "position": "top-center"},
+  "scenes": [
+    {"start":0,"end":2,"label":"RUSTY TOOL","action":"Show the starting condition","object_before":"Heavy surface rust","object_after":"Heavy surface rust","source":"media/scene01.mp4","license":"owner-provided"},
+    {"start":2,"end":5,"label":"INSPECT","action":"Inspect the tool","object_before":"Heavy surface rust","object_after":"Rust areas identified","source":"media/scene02.mp4","license":"owner-provided"},
+    {"start":5,"end":10,"label":"REMOVE RUST","action":"Brush loose rust away","object_before":"Rust areas identified","object_after":"Loose rust removed","source":"media/scene03.mp4","license":"owner-provided"},
+    {"start":10,"end":16,"label":"CLEAN","action":"Clean the exposed metal","object_before":"Loose rust removed","object_after":"Surface is clean","source":"media/scene04.mp4","license":"owner-provided"},
+    {"start":16,"end":23,"label":"SMOOTH","action":"Smooth rough areas","object_before":"Surface is clean","object_after":"Rough edges reduced","source":"media/scene05.mp4","license":"owner-provided"},
+    {"start":23,"end":29,"label":"POLISH","action":"Polish the metal","object_before":"Rough edges reduced","object_after":"Metal is polished","source":"media/scene06.mp4","license":"owner-provided"},
+    {"start":29,"end":34,"label":"FINAL DETAILS","action":"Apply the final finish","object_before":"Metal is polished","object_after":"Restored tool ready","source":"media/scene07.mp4","license":"owner-provided"},
+    {"start":34,"end":37,"label":"KEEP WATCHING","action":"Show the finished process moment","object_before":"Restored tool ready","object_after":"Restored tool ready","source":"media/scene08.mp4","license":"owner-provided"},
+    {"start":37,"end":40,"label":"RESTORED","action":"Show the completed tool","object_before":"Restored tool ready","object_after":"Completed restored tool","source":"media/scene09.mp4","license":"owner-provided"}
+  ]
+}

@@ -1,0 +1,66 @@
+name: 40s Shorts Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      plan:
+        description: "Video plan JSON path"
+        required: true
+        default: "shorts_bot/examples/restoration_plan.json"
+      publish:
+        description: "Reserved for an explicitly approved YouTube publish step"
+        required: true
+        type: boolean
+        default: false
+  schedule:
+    - cron: "0 9 * * *"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build-and-qc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: FFmpeg and OCR
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg tesseract-ocr
+
+      - name: Unit tests
+        run: python -m unittest discover -s shorts_bot/tests -v
+
+      - name: Render verified plan, or safe test demo
+        shell: bash
+        run: |
+          mkdir -p shorts_bot/out
+          PLAN="${{ inputs.plan || 'shorts_bot/examples/restoration_plan.json' }}"
+          if [ -f shorts_bot/media/scene01.mp4 ]; then
+            python shorts_bot/shorts_bot.py run "$PLAN" --output shorts_bot/out/shorts.mp4
+          else
+            python shorts_bot/shorts_bot.py demo --output shorts_bot/out/demo.mp4 || test "$?" -eq 2
+          fi
+
+      - name: Upload MP4 and QC report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shorts-bot-output
+          path: shorts_bot/out/
+          if-no-files-found: error
+
+      - name: Publish gate
+        if: ${{ inputs.publish == true }}
+        run: |
+          echo "Yayın kapısı açık ancak YouTube OAuth ve son onay olmadan yükleme yapılmayacak."
+          exit 1

@@ -1,0 +1,18 @@
+{
+  "content_spec": {
+    "category": "metalworking",
+    "title": "How a Steel Propeller Is Manufactured",
+    "description": "A steel propeller is forged, machined, balanced and polished step by step.",
+    "original_ai_scenes": true,
+    "realistic_ai": true,
+    "ai_disclosure": true
+  },
+  "title": "How a Steel Propeller Is Manufactured",
+  "language": "en",
+  "duration": 40.0,
+  "realistic_ai": true,
+  "ai_disclosure": true,
+  "synthetic_content": true,
+  "cta": {"text": "LIKE + SUBSCRIBE", "start": 34, "end": 37, "position": "top-center"},
+  "scenes": []
+}

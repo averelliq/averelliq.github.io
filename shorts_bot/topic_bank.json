@@ -1,0 +1,10 @@
+[
+  {"category":"metalworking","title":"How a Steel Propeller Is Manufactured","description":"A steel propeller is forged, machined, balanced and polished step by step."},
+  {"category":"vehicle_manufacturing","title":"How a Car Engine Is Assembled","description":"An engine block is inspected, machined, fitted with pistons and assembled into a working engine."},
+  {"category":"metalworking","title":"How a Mini Katana Is Forged","description":"A steel billet is heated, hammered, shaped, ground and polished into a miniature katana."},
+  {"category":"woodworking","title":"How a Wooden Car Is Built","description":"Wood is measured, cut, shaped, joined, sanded and finished as a small wooden car."},
+  {"category":"mechanical_restoration","title":"Restoring a Rusty Engine","description":"A rusty engine is disassembled, cleaned, repaired, painted and carefully reassembled."},
+  {"category":"antique_restoration","title":"Restoring an Antique Machine","description":"An old machine is documented, taken apart, cleaned, repaired and brought back to working order."},
+  {"category":"tool_making","title":"How a Hand Tool Is Made","description":"Steel is cut, heated, forged, machined, hardened and fitted into a finished hand tool."},
+  {"category":"shipbuilding","title":"How a Ship Propeller Is Balanced","description":"A large propeller is cast, machined, measured and balanced before installation."}
+]
