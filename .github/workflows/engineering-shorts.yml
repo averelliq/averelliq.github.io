@@ -1,0 +1,79 @@
+name: Engineering Shorts - Render MP4
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: Engineering topic
+        required: true
+        type: choice
+        default: jet
+        options:
+          - jet
+          - tunnel
+          - space
+          - submarine
+          - crane
+          - recorder
+          - auto
+  pull_request:
+    paths:
+      - 'engineering-shorts-bot/**'
+      - '.github/workflows/engineering-shorts.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'engineering-shorts-bot/**'
+      - '.github/workflows/engineering-shorts.yml'
+permissions:
+  contents: read
+concurrency:
+  group: engineering-shorts-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        working-directory: engineering-shorts-bot
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install JavaScript dependencies
+        run: npm install --no-audit --no-fund
+      - name: Validate curated topic bank
+        run: npm run check
+      - name: Install offline narration engine
+        run: python -m pip install piper-tts==1.3.0
+      - name: Download Piper English voice model
+        run: |
+          mkdir -p voices
+          curl -fL --retry 3 -o voices/en_US-ryan-medium.onnx 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/ryan/medium/en_US-ryan-medium.onnx?download=true'
+          curl -fL --retry 3 -o voices/en_US-ryan-medium.onnx.json 'https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/ryan/medium/en_US-ryan-medium.onnx.json?download=true'
+          test "$(wc -c < voices/en_US-ryan-medium.onnx)" -gt 60000000
+      - name: Generate English voice and video plan
+        run: python scripts/voice.py --topic '${{ inputs.topic || 'jet' }}'
+      - name: Render 1080x1920 MP4 with Remotion
+        run: npm run render
+      - name: Validate MP4 and audio
+        run: npm run check
+      - name: Upload video for manual review (never auto publish)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: engineering-short-${{ inputs.topic || 'jet' }}
+          path: |
+            engineering-shorts-bot/out/engineering-short.mp4
+            engineering-shorts-bot/out/metadata.json
+          retention-days: 7
+          if-no-files-found: warn
