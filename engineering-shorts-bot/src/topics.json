@@ -1,0 +1,68 @@
+[
+  {
+    "id": "jet", "title": "How Does a Jet Engine Work?", "hook": "Most of the air in this jet engine never touches the fire.",
+    "scenes": [
+      {"label":"THE SECRET", "part":"BYPASS AIR", "line":"Most of the air passing through this modern jet engine never even touches the fire."},
+      {"label":"THE GIANT FAN", "part":"FAN", "line":"First, a giant fan pulls air in. Much of it flows around the engine core."},
+      {"label":"SQUEEZE THE AIR", "part":"COMPRESSOR", "line":"Inside the core, compressor stages squeeze the remaining air to a higher pressure."},
+      {"label":"CONTINUOUS FIRE", "part":"COMBUSTOR", "line":"Fuel mixes with compressed air and burns continuously, making high energy gas."},
+      {"label":"POWER FROM GAS", "part":"TURBINE", "line":"The hot gas spins turbines connected by shafts to the compressor and the big fan."},
+      {"label":"THE THRUST", "part":"THRUST", "line":"The fan and the core accelerate air backward. That change in momentum pushes the aircraft forward. Follow for more engineering."}
+    ]
+  },
+  {
+    "id":"tunnel", "title":"How Do Giant Tunnel Boring Machines Work?", "hook":"This machine builds a tunnel as it digs.",
+    "scenes":[
+      {"label":"A MOVING FACTORY", "part":"CUTTER", "line":"A tunnel boring machine does more than drill. It can build the tunnel as it moves."},
+      {"label":"CUTTERHEAD", "part":"CUTTER", "line":"Its rotating cutterhead presses hardened cutting tools into the ground ahead."},
+      {"label":"REMOVE THE SPOIL", "part":"CONVEYOR", "line":"Excavated material travels backward on conveyors or through a slurry pipeline, depending on the machine."},
+      {"label":"PUSH FORWARD", "part":"JACKS", "line":"Hydraulic jacks press against the completed tunnel lining to move the machine forward."},
+      {"label":"BUILD THE WALL", "part":"RINGS", "line":"In many soft ground machines, an erector places precast concrete segments into a protective ring."},
+      {"label":"REPEAT", "part":"TUNNEL", "line":"Cut, remove, push, and install the next ring. The exact method depends on the geology. Follow for more engineering."}
+    ]
+  },
+  {
+    "id":"space", "title":"How Do Spacecraft Survive Reentry?", "hook":"A spacecraft survives reentry by managing extreme heat.",
+    "scenes":[
+      {"label":"THE HOT RETURN", "part":"ATMOSPHERE", "line":"Returning from orbit, a spacecraft plows into increasingly dense air at enormous speed."},
+      {"label":"HOT GAS", "part":"SHOCK", "line":"Air compressed by the shock wave becomes extremely hot in front of the vehicle."},
+      {"label":"HEAT SHIELD", "part":"SHIELD", "line":"The heat shield keeps most of that heat away from the crew or sensitive equipment."},
+      {"label":"TWO STRATEGIES", "part":"ABLATION", "line":"Some shields deliberately shed material as they heat up. Others use reusable insulating tiles."},
+      {"label":"SLOW DOWN", "part":"DRAG", "line":"Atmospheric drag takes away the spacecraft's kinetic energy and slows its descent."},
+      {"label":"SAFE DESCENT", "part":"LAND", "line":"Shield design depends on the vehicle and mission. It is not simply a layer of ordinary metal. Follow for more engineering."}
+    ]
+  },
+  {
+    "id":"submarine", "title":"How Do Submarines Control Their Depth?", "hook":"A submarine can change its buoyancy on purpose.",
+    "scenes":[
+      {"label":"SINK ON PURPOSE", "part":"BALLAST", "line":"A submarine uses ballast tanks to change how much water it displaces relative to its weight."},
+      {"label":"FLOOD THE TANKS", "part":"FLOOD", "line":"To dive from the surface, seawater enters the main ballast tanks as air escapes."},
+      {"label":"TRIM THE BOAT", "part":"TRIM", "line":"Smaller trim tanks help balance the submarine and adjust its buoyancy."},
+      {"label":"STEER UNDERWATER", "part":"PLANES", "line":"While moving, diving planes generate hydrodynamic forces to control depth and angle."},
+      {"label":"COME BACK UP", "part":"AIR", "line":"Compressed air can force water out of the main ballast tanks to restore positive buoyancy."},
+      {"label":"A CONTROLLED BALANCE", "part":"SURFACE", "line":"Buoyancy, trim, speed, and control surfaces work together to manage a dive. Follow for more engineering."}
+    ]
+  },
+  {
+    "id":"crane", "title":"How Do Tower Cranes Grow Taller?", "hook":"This crane can help build itself higher.",
+    "scenes":[
+      {"label":"A SELF CLIMBING CRANE", "part":"CRANE", "line":"Some tower cranes grow taller using a special hydraulic climbing frame."},
+      {"label":"MAKE ROOM", "part":"JACK", "line":"The climbing system temporarily lifts the upper crane assembly to make room below."},
+      {"label":"INSERT A SECTION", "part":"MAST", "line":"An additional mast section is moved into the opening using the crane or an assist mechanism."},
+      {"label":"SECURE THE JOINT", "part":"BOLTS", "line":"Crews align and securely connect the new section following the manufacturer's procedures."},
+      {"label":"CLIMB AGAIN", "part":"REPEAT", "line":"The climbing frame resets so the process can be repeated for another section."},
+      {"label":"STAY STABLE", "part":"ANCHOR", "line":"Tall cranes may also need ties to the building, according to their engineered design. Follow for more engineering."}
+    ]
+  },
+  {
+    "id":"recorder", "title":"How Do Flight Recorders Survive Crashes?", "hook":"An aircraft black box is built to protect its memory.",
+    "scenes":[
+      {"label":"NOT ACTUALLY BLACK", "part":"ORANGE", "line":"Flight recorders are usually bright orange so investigators can find them more easily."},
+      {"label":"SAVE THE DATA", "part":"MEMORY", "line":"Crash protected memory stores flight data or cockpit audio, depending on the recorder."},
+      {"label":"IMPACT PROTECTION", "part":"SHELL", "line":"A tough protective enclosure helps the memory survive severe impact loads."},
+      {"label":"FIRE AND HEAT", "part":"THERMAL", "line":"Thermal insulation and protective materials help it withstand extreme heat for specified periods."},
+      {"label":"UNDERWATER", "part":"BEACON", "line":"A fitted underwater locator beacon emits acoustic pings after it is activated by water."},
+      {"label":"FIND THE ANSWERS", "part":"RECOVER", "line":"Protection improves the chance of recovering crucial evidence, but no device is indestructible. Follow for more engineering."}
+    ]
+  }
+]
