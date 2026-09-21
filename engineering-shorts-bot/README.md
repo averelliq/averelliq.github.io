@@ -1,28 +1,29 @@
-# Engineering Shorts Bot V1 — GitHub Actions + Remotion
+# Engineering Shorts Bot V2 — GitHub Actions + Remotion
 
-**Status:** GitHub Actions proof-of-concept successfully rendered and technically checked a jet-engine MP4 on 21 September 2026 (PR run 35581453237). No YouTube upload is configured; the video has not been manually reviewed for visual quality or voice naturalness.
+**Status:** V2 jet-engine test rendered on GitHub Actions on 21 September 2026 (run 35583197106). The MP4 passed resolution, audio, duration and automated black-frame checks. The engineering animation is still illustrative, not photorealistic footage or a verified CAD model. No YouTube upload is configured.
 
-This bot lives only in `engineering-shorts-bot/` and `.github/workflows/engineering-shorts.yml` in the existing repository. Other site content and existing bots are unchanged.
+The project lives only in `engineering-shorts-bot/` and `.github/workflows/engineering-shorts.yml`; existing bots and website content are unchanged.
 
-## Start from GitHub — no computer installation needed
-1. Open the repository **Actions** tab, then select **Engineering Shorts - Render MP4**.
-2. Click **Run workflow**, choose a topic (`jet`, `tunnel`, `space`, `submarine`, `crane`, `recorder`, or `auto`) and click the green Run workflow button.
-3. Open the completed run. Under **Artifacts**, download `engineering-short-...`; unzip and open `engineering-short.mp4`.
-4. Inspect the video and voice. Publish manually only after you approve the actual content.
+## Generate a Short without your computer
+1. Open **Actions → Engineering Shorts - Render MP4 → Run workflow**.
+2. Choose `jet`, `tunnel`, `space`, `submarine`, `crane`, `recorder`, or `auto`, then start the run.
+3. When the run finishes, open its **Artifacts** section, download `engineering-short-...`, unzip it and review `engineering-short.mp4`.
+4. Upload to YouTube manually **only after** you are satisfied with the image, spoken English, and technical facts.
 
-`auto` rotates across the six fixed topics using UTC date; it does **not** discover new topics on the internet. A test also runs automatically when this bot is updated by a pull request or merged to main. Routine video production is started manually. No YouTube account permissions, API keys or secrets are required.
+`auto` rotates through six curated topics by UTC date. It does NOT discover new internet topics. Pull requests and main-branch code changes trigger CI tests, but routine production is manual. GitHub's included compute and artifact storage are subject to account limits and platform rules.
 
-## Implemented features and limits
-- Six carefully written, predefined English explanatory topics and a basic `auto` topic rotation.
-- Piper's locally executed en_US-ryan-medium English synthetic narration (downloaded by the GitHub runner), with narrated scenes and animated English text.
-- Remotion vector diagrams with some rotating/moving schematic parts, at 1080 × 1920, 30 FPS, encoded as H.264 MP4 with voice audio.
-- Technical validation of dimensions, an audio stream, and a 40–95-second duration. Video files are saved as a GitHub Artifact even if technical QA fails, where possible. Artifacts expire after 7 days.
-- GitHub-hosted rendering with no need to keep your Windows computer switched on.
+## What V2 improves
+- Dedicated, layered, animated **2D turbofan cutaway** for the `jet` topic, with stage-specific fan, bypass/core airflow, compressor stages, combustor, turbine, connecting shaft and exhaust emphasis.
+- Bigger portrait diagram, tighter spacing and larger five-word English subtitle chunks.
+- Removed per-scene opacity fades that introduced a completely dark frame at cuts in an early V2 test.
+- Added full-video FFmpeg screening for black frames, alongside 1080×1920, audio-track and 40–95-second duration checks.
+- Retained topic-specific schematic graphics for the five other curated engineering topics and offline Piper English speech.
 
-**Not implemented:** real stock-footage discovery, AI-generated photorealistic footage, complex accurate 3D mechanical simulation, live AI topic discovery, automatic YouTube publishing, or guaranteed natural humanlike voice. These are schematic animated explanations, not real manufacturing footage. Technical QA does not verify the appearance, factual accuracy, music, perceived quality, or audience retention. Watch each output before publishing. Check the Piper voice model license/card before commercial use.
+## Boundaries
+There is NO automatic sourcing of footage, no truly photorealistic or mechanically validated 3D model, no novel AI subject research, no word-level forced subtitle alignment, no automatic YouTube upload, and no guarantee that Piper sounds like a human. The visual geometry is a teaching illustration, not engineering documentation. Black-frame checks do not establish visual quality or audience retention. Verify voice-model licensing before commercial publication.
 
-## Optional local development
-Requires Node.js 22+, Python 3.11, FFmpeg, `pip install piper-tts==1.3.0`, plus `en_US-ryan-medium.onnx` and its `.json` voice config from the `rhasspy/piper-voices` v1.0.0 repository placed in `voices/`.
+## Optional local use
+Node.js 22+, Python 3.11, FFmpeg, `pip install piper-tts==1.3.0`, and Piper `en_US-ryan-medium.onnx` plus its `.json` configuration in `voices/` are required.
 
 ```bash
 cd engineering-shorts-bot
@@ -32,5 +33,4 @@ npm run render
 npm run check
 ```
 
-## Cost and safety
-The workflow uses no paid AI APIs and never uploads to YouTube. GitHub usage/storage limits and future pricing changes may apply. The GitHub workflow uses read-only repository permissions and retains video artifacts for 7 days. No secrets are stored in this repository.
+Outputs are available as GitHub Actions artifacts for 7 days. No paid AI APIs, YouTube credentials or repository secrets are required by this workflow.
