@@ -28,7 +28,7 @@ permissions:
   contents: read
 concurrency:
   group: engineering-shorts-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   render:
     runs-on: ubuntu-latest
@@ -68,6 +68,7 @@ jobs:
       - name: Validate MP4 and audio
         run: npm run check
       - name: Upload video for manual review (never auto publish)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: engineering-short-${{ inputs.topic || 'jet' }}
@@ -75,4 +76,4 @@ jobs:
             engineering-shorts-bot/out/engineering-short.mp4
             engineering-shorts-bot/out/metadata.json
           retention-days: 7
-          if-no-files-found: error
+          if-no-files-found: warn
