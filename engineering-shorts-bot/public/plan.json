@@ -1,0 +1,1 @@
+{"id":"jet","title":"How Does a Jet Engine Work?","fps":30,"totalFrames":1800,"scenes":[{"label":"PREVIEW ONLY","part":"FAN","line":"Run voice.py to generate audio before rendering.","fromFrame":0,"durationInFrames":1800,"audio":"audio/00.wav"}]}
