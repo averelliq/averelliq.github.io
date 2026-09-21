@@ -10,8 +10,10 @@ if (existsSync('out/engineering-short.mp4')) {
   const data = JSON.parse(execFileSync('ffprobe', ['-v','error','-show_entries','stream=codec_type,width,height','-show_entries','format=duration','-of','json','out/engineering-short.mp4'], {encoding:'utf8'}));
   const video = data.streams.find(s => s.codec_type === 'video');
   const audio = data.streams.find(s => s.codec_type === 'audio');
-  if (video?.width !== 1080 || video?.height !== 1920 || !audio || Number(data.format.duration) < 30 || Number(data.format.duration) > 95) throw Error('Render QA failed: geometry, audio or duration');
-  console.log(`Render technical QA OK: 1080x1920, audio track, ${Number(data.format.duration).toFixed(1)} seconds.`);
+  const duration = Number(data.format.duration);
+  console.log(`MP4 properties: ${video?.width || '?'}x${video?.height || '?'}, audio=${Boolean(audio)}, duration=${duration.toFixed(2)}s`);
+  if (video?.width !== 1080 || video?.height !== 1920 || !audio || duration < 40 || duration > 95) throw Error('Render QA failed: require 1080x1920, audio and 40-95 seconds. Review the MP4 artifact.');
+  console.log('Render technical QA OK. This does not verify visual quality or factual accuracy.');
 } else {
   console.log('No MP4 found: video-level QA not yet performed.');
 }
