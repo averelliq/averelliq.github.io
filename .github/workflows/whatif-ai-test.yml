@@ -1,0 +1,68 @@
+name: What If AI - cloud test (review only)
+
+on:
+  push:
+    paths:
+      - '.github/workflows/whatif-ai-test.yml'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "preview = free CPU motion demo; ai = MuAPI credit-based 3D generation"
+        required: true
+        type: choice
+        options:
+          - preview
+          - ai
+        default: preview
+      allow_credit_use:
+        description: "Explicitly authorize MuAPI credit use (AI mode only)"
+        required: true
+        type: boolean
+        default: false
+      max_usd:
+        description: "Maximum estimated USD cost for this ONE 5-second AI generation"
+        required: true
+        default: '0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: whatif-ai-test-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install cloud dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          python -m pip install --disable-pip-version-check 'Pillow>=10,<13' 'requests>=2.31,<3'
+      - name: Safety/unit tests
+        run: python -m unittest discover -s whatif_ai_bot -p 'test_*.py' -v
+      - name: Run preview or explicitly authorized AI test
+        env:
+          MUAPI_API_KEY: ${{ secrets.MUAPI_API_KEY }}
+          MODE: ${{ inputs.mode || 'preview' }}
+          ALLOW_CREDIT_USE: ${{ inputs.allow_credit_use || 'false' }}
+          MAX_USD: ${{ inputs.max_usd || '0' }}
+        shell: bash
+        run: |
+          args=(--mode "$MODE" --max-usd "$MAX_USD" --output whatif_ai_bot/out)
+          if [[ "$ALLOW_CREDIT_USE" == "true" ]]; then args+=(--allow-credit-use); fi
+          python whatif_ai_bot/test_open_gen.py "${args[@]}"
+      - name: Upload review-only MP4 and metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: whatif-ai-5s-review
+          path: whatif_ai_bot/out/
+          if-no-files-found: warn
+          retention-days: 3
